@@ -1,0 +1,7 @@
+file:
+  path: /tmp/file_a1
+  content: Content of first file!
+
+file:
+  path: /tmp/file_a2
+  content: Content of second file!
