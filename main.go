@@ -1,74 +1,14 @@
 package duck
 
 import (
-	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
-	"syscall"
 )
 
 var (
 	nextid int
 	items  []Item
 )
-
-type File struct {
-	Path    string
-	Content string
-	User    User
-
-	id int
-}
-
-func (f *File) setID(id int) {
-	f.id = id
-}
-func (f *File) getID() int {
-	return f.id
-}
-func (f *File) apply() error {
-	buf, err := ioutil.ReadFile(f.Path)
-	//fmt.Printf("path %#v err %#v compare %#v buf %#v content %#v\n", f.Path, err, bytes.Compare(buf, []byte(f.Content)), string(buf), f.Content)
-	if err == nil && bytes.Compare(buf, []byte(f.Content)) == 0 {
-		// no change
-		return nil
-	}
-	if err != nil && iserrnotfound(err) {
-		fmt.Printf("+ %s\n", f.Path)
-	} else {
-		reason := "content updated"
-		if err != nil {
-			reason = err.Error()
-		}
-		fmt.Printf("~ %s (%s)\n", f.Path, reason)
-	}
-	fh, err := os.Create(f.Path)
-	if err != nil {
-		return err
-	}
-	defer fh.Close()
-	if _, err := fh.Write([]byte(f.Content)); err != nil {
-		return err
-	}
-	if err := fh.Close(); err != nil {
-		return err
-	}
-	return nil
-}
-
-type User struct {
-	Name     string
-	Password string
-
-	Uid        int
-	Gid        int
-	GroupNames []string
-}
-type Group struct {
-	Name string
-	Gid  int
-}
 
 type Package struct {
 	Name string
@@ -105,15 +45,6 @@ func Apply() error {
 		}
 	}
 	return firsterr
-}
-
-func iserrnotfound(err error) bool {
-	// TODO do this better
-	v, ok := err.(*os.PathError)
-	if ok && v != nil && v.Err == syscall.ENOENT {
-		return true
-	}
-	return false
 }
 
 /*func Main(items ...Item) {
