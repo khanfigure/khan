@@ -1,11 +1,5 @@
-module ducktest
+module github.com/yobert/duck
 
 go 1.15
 
-replace github.com/yobert/duck v0.0.1 => ./duck
-
-require (
-	github.com/pkg/errors v0.9.1 // indirect
-	github.com/yobert/duck v0.0.1
-	gopkg.in/yaml.v2 v2.4.0 // indirect
-)
+require gopkg.in/yaml.v3 v3.0.0-20200615113413-eeeca48fe776
