@@ -1,9 +1,9 @@
 package main
 
 import (
-	"path"
 	"os"
 	"os/exec"
+	"path"
 )
 
 func initialize() error {

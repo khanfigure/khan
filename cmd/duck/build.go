@@ -1,8 +1,8 @@
 package main
 
 import (
-	"io"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -48,7 +48,7 @@ func build() error {
 		}
 	}
 
-	if _, err := os.Stat(wd+"/main.go"); err != nil {
+	if _, err := os.Stat(wd + "/main.go"); err != nil {
 		if err := ioutil.WriteFile(wd+"/main.go", []byte(fmt.Sprintf(`package main
 import (
 	"fmt"
@@ -90,7 +90,7 @@ func copyglobs(dest string, globs ...string) error {
 		for _, match := range matches {
 			base := filepath.Base(match)
 			//dir := filepath.Dir(match)
-			to := dest+"/"+base
+			to := dest + "/" + base
 
 			destfh, err := os.Create(to)
 			if err != nil {
@@ -112,4 +112,3 @@ func copyglobs(dest string, globs ...string) error {
 	}
 	return nil
 }
-
