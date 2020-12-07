@@ -1,16 +1,34 @@
 package main
 
 import (
+	"io"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
-	"strings"
 )
 
 func build() error {
+
+	// enter a private space in /tmp so that we don't clutter the cwd with
+	// generated intermediate crap
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	wd, err := ioutil.TempDir("", "duck")
+	if err != nil {
+		return err
+	}
+
+	if err := copyglobs(wd, "*.go", "go.mod", "go.sum"); err != nil {
+		return err
+	}
+
 	matches, err := filepath.Glob("*.yaml")
 	if err != nil {
 		return err
@@ -23,15 +41,15 @@ func build() error {
 	sort.Strings(matches)
 
 	for _, match := range matches {
-		basename := strings.TrimSuffix(strings.TrimSuffix(match, ".yaml"), ".yml")
-		goname := basename + "_fromyaml.go"
-		if err := yaml2go(match, goname); err != nil {
+		base := filepath.Base(match)
+		goname := base + ".go"
+		if err := yaml2go(match, wd+"/"+goname); err != nil {
 			return err
 		}
 	}
 
-	if _, err := os.Stat("main.go"); err != nil {
-		if err := ioutil.WriteFile("mainmain_fromyaml.go", []byte(fmt.Sprintf(`package main
+	if _, err := os.Stat(wd+"/main.go"); err != nil {
+		if err := ioutil.WriteFile(wd+"/main.go", []byte(fmt.Sprintf(`package main
 import (
 	"fmt"
 	"os"
@@ -50,12 +68,48 @@ func main() {
 		}
 	}
 
-	cmd := exec.Command("go", "build")
+	cmd := exec.Command("go", "build", "-o", cwd+"/duck")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+	cmd.Dir = wd
 	if err := cmd.Run(); err != nil {
 		return err
 	}
 
+	// not in defer on purpose: I don't want to clean up the build folder
+	// when there is an error for now, so I can debug.
+	return os.RemoveAll(wd)
+}
+
+func copyglobs(dest string, globs ...string) error {
+	for _, g := range globs {
+		matches, err := filepath.Glob(g)
+		if err != nil {
+			return err
+		}
+		for _, match := range matches {
+			base := filepath.Base(match)
+			//dir := filepath.Dir(match)
+			to := dest+"/"+base
+
+			destfh, err := os.Create(to)
+			if err != nil {
+				return err
+			}
+			defer destfh.Close()
+			srcfh, err := os.Open(match)
+			if err != nil {
+				return err
+			}
+			defer srcfh.Close()
+			if _, err := io.Copy(destfh, srcfh); err != nil {
+				return err
+			}
+			if err := destfh.Close(); err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
+
