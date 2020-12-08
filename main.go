@@ -17,7 +17,7 @@ type Package struct {
 type Item interface {
 	setID(id int)
 	getID() int
-	apply() error
+	apply(*run) error
 }
 
 func Add(add ...Item) {
@@ -35,11 +35,13 @@ func Add(add ...Item) {
 }
 
 func Apply() error {
+	r := &run{}
+
 	var firsterr error
 	for _, item := range items {
-		if err := item.apply(); err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			if firsterr != nil {
+		if err := item.apply(r); err != nil {
+			fmt.Fprintln(os.Stderr, item, err)
+			if firsterr == nil {
 				firsterr = err
 			}
 		}

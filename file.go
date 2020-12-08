@@ -16,13 +16,17 @@ type File struct {
 	id int
 }
 
+func (f *File) String() string {
+	return f.Path
+}
+
 func (f *File) setID(id int) {
 	f.id = id
 }
 func (f *File) getID() int {
 	return f.id
 }
-func (f *File) apply() error {
+func (f *File) apply(r *run) error {
 	buf, err := ioutil.ReadFile(f.Path)
 	if err == nil && bytes.Compare(buf, []byte(f.Content)) == 0 {
 		// no change
