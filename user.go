@@ -3,6 +3,7 @@ package duck
 import (
 	"bytes"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -52,6 +53,8 @@ func (u *User) getID() int {
 	return u.id
 }
 func (u *User) apply(r *run) error {
+	r.addStat("users")
+
 	r.userCacheMu.Lock()
 	defer r.userCacheMu.Unlock()
 
@@ -72,16 +75,19 @@ func (u *User) apply(r *run) error {
 		old = r.userCache[u.Name]
 	}
 
+	modified := false
+
 	if old == nil {
+		r.addStat("users new")
 		fmt.Printf("+ user %s (group %s)\n", u.Name, usergroup)
-		args := []string{""}
+		args := []string{"-g", usergroup, "-u", strconv.Itoa(u.Uid), u.Name}
 		if u.Gecos != "" {
 			args = append(args, "-c", u.Gecos)
 		}
 		if len(u.Groups) > 0 {
 			args = append(args, "-G", strings.Join(u.Groups, ","))
 		}
-		if err := printExec("useradd", "-g", usergroup, "-o", strconv.Itoa(u.Uid), u.Name); err != nil {
+		if err := printExec(r, "useradd", args...); err != nil {
 			return err
 		}
 		newuser := User{
@@ -94,8 +100,9 @@ func (u *User) apply(r *run) error {
 		r.uidCache[newuser.Uid] = &newuser
 	} else {
 		if old.Name != u.Name {
+			modified = true
 			fmt.Printf("~ uid %d (name %s → %s)\n", u.Uid, old.Name, u.Name)
-			if err := printExec("usermod", "-l", u.Name, old.Name); err != nil {
+			if err := printExec(r, "usermod", "-l", u.Name, old.Name); err != nil {
 				return err
 			}
 			newuser := *old
@@ -105,8 +112,9 @@ func (u *User) apply(r *run) error {
 			delete(r.userCache, old.Name)
 		}
 		if old.Uid != u.Uid {
+			modified = true
 			fmt.Printf("~ user %s (uid %d → %d)\n", u.Name, old.Uid, u.Uid)
-			if err := printExec("usermod", "-u", strconv.Itoa(u.Uid), u.Name); err != nil {
+			if err := printExec(r, "usermod", "-u", strconv.Itoa(u.Uid), u.Name); err != nil {
 				return err
 			}
 			newuser := *old
@@ -127,9 +135,10 @@ func (u *User) apply(r *run) error {
 		newpw = "!"
 	}
 	if oldpw != newpw {
+		modified = true
 		fmt.Printf("~ user %s (password)\n", u.Name)
 		input := bytes.NewBuffer([]byte(u.Name + ":" + newpw + "\n"))
-		if err := printExecStdin(input, "chpasswd", "-e"); err != nil {
+		if err := printExecStdin(r, input, "chpasswd", "-e"); err != nil {
 			return err
 		}
 		newuser := *old
@@ -140,12 +149,48 @@ func (u *User) apply(r *run) error {
 	}
 
 	old = r.userCache[u.Name]
+	resetgroups := false
+	sort.Strings(old.Groups)
+	sort.Strings(u.Groups)
+	if len(old.Groups) != len(u.Groups) {
+		resetgroups = true
+	} else if len(u.Groups) > 0 {
+		for i, gg := range old.Groups {
+			if u.Groups[i] != gg {
+				resetgroups = true
+				break
+			}
+		}
+	}
+	if resetgroups {
+		modified = true
+		oldstr := strings.Join(old.Groups, ", ")
+		newstr := strings.Join(u.Groups, ", ")
+		if oldstr == "" {
+			oldstr = "none"
+		}
+		if newstr == "" {
+			newstr = "none"
+		}
+		fmt.Printf("~ user %s groups (%s → %s)\n", u.Name, oldstr, newstr)
+		if err := printExec(r, "usermod", "-G", strings.Join(u.Groups, ","), u.Name); err != nil {
+			return err
+		}
+		old.Groups = u.Groups
+	}
+
+	old = r.userCache[u.Name]
 	if old.Group != usergroup {
+		modified = true
 		fmt.Printf("~ user %s (primary group %s → %s)\n", u.Name, old.Group, usergroup)
-		if err := printExec("usermod", "-g", usergroup, u.Name); err != nil {
+		if err := printExec(r, "usermod", "-g", usergroup, u.Name); err != nil {
 			return err
 		}
 		old.Group = usergroup
+	}
+
+	if modified {
+		r.addStat("users modified")
 	}
 
 	return nil

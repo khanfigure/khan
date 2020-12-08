@@ -245,9 +245,6 @@ func yaml2struct(w *yamlwalker, v *yaml.Node, si interface{}) error {
 		alreadyset[k.Value] = true
 
 		// TODO support arrays and structs
-		if v.Kind != yaml.ScalarNode {
-			return w.nodeErrorf(v, "%s %s expected scaler: Got %s", Title, param, yamlkind(v.Kind))
-		}
 
 		if !any {
 			*w.gobuf += "\n"
@@ -257,17 +254,9 @@ func yaml2struct(w *yamlwalker, v *yaml.Node, si interface{}) error {
 		if !f.CanSet() {
 			return w.nodeErrorf(v, "%s %s cannot be set", Title, k.Value)
 		}
-		switch ft.Type.Kind() {
-		case reflect.String:
-			f.SetString(v.Value)
-		case reflect.Int:
-			vi, err := strconv.Atoi(v.Value)
-			if err != nil {
-				return w.nodeErrorf(v, "%s %s conversion to integer failed: %w", Title, param, err)
-			}
-			f.SetInt(int64(vi))
-		default:
-			return w.nodeErrorf(v, "%s %s has unhandled type %s", Title, param, ft.Type.Kind())
+
+		if err := yaml2value(w, v, f); err != nil {
+			return err
 		}
 
 		*w.gobuf += fmt.Sprintf("\t\t%s: %#v,\n", ft.Name, f.Interface())
@@ -278,6 +267,62 @@ func yaml2struct(w *yamlwalker, v *yaml.Node, si interface{}) error {
 	}
 	*w.gobuf += "})\n"
 
+	return nil
+}
+
+func yaml2value(w *yamlwalker, v *yaml.Node, dest reflect.Value) error {
+	typ := dest.Type()
+	switch typ.Kind() {
+	case reflect.String:
+		if v.Kind != yaml.ScalarNode {
+			return w.nodeErrorf(v, "Expected scaler convertable to %s: Got %s", typ.Kind(), yamlkind(v.Kind))
+		}
+		dest.SetString(v.Value)
+	case reflect.Int:
+		if v.Kind != yaml.ScalarNode {
+			return w.nodeErrorf(v, "Expected scaler convertable to %s: Got %s", typ.Kind(), yamlkind(v.Kind))
+		}
+		vi, err := strconv.Atoi(v.Value)
+		if err != nil {
+			return w.nodeErrorf(v, "Conversion to integer failed: %w", err)
+		}
+		dest.SetInt(int64(vi))
+	case reflect.Bool:
+		if v.Kind != yaml.ScalarNode {
+			return w.nodeErrorf(v, "Expected scaler convertable to %s: Got %s", typ.Kind(), yamlkind(v.Kind))
+		}
+		vb, err := strconv.ParseBool(v.Value)
+		if err != nil {
+			return w.nodeErrorf(v, "Conversion to boolean failed: %w", err)
+		}
+		dest.SetBool(vb)
+	case reflect.Slice:
+		sv := reflect.MakeSlice(typ, len(v.Content), len(v.Content))
+
+		if v.Kind != yaml.SequenceNode {
+			// Special case: Empty scalar is allowed as empty list.
+			if v.Kind == yaml.ScalarNode && v.Value == "" {
+				dest.Set(sv)
+				return nil
+			}
+
+			return w.nodeErrorf(v, "Expected array: Got %s", yamlkind(v.Kind))
+		}
+
+		for i := 0; i < len(v.Content); i++ {
+			vv := v.Content[i]
+			rv := reflect.New(typ.Elem())
+			if err := yaml2value(w, vv, rv.Elem()); err != nil {
+				return err
+			}
+			sv.Index(i).Set(rv.Elem())
+		}
+
+		dest.Set(sv)
+
+	default:
+		return w.nodeErrorf(v, "Unhandled type %s", typ.Kind())
+	}
 	return nil
 }
 

@@ -30,6 +30,8 @@ func (g *Group) getID() int {
 }
 
 func (g *Group) apply(r *run) error {
+	r.addStat("groups")
+
 	r.userCacheMu.Lock()
 	defer r.userCacheMu.Unlock()
 
@@ -46,8 +48,9 @@ func (g *Group) apply(r *run) error {
 	}
 
 	if old == nil {
+		r.addStat("groups new")
 		fmt.Printf("+ group %s (gid %d)\n", g.Name, g.Gid)
-		if err := printExec("groupadd", "-g", strconv.Itoa(g.Gid), g.Name); err != nil {
+		if err := printExec(r, "groupadd", "-g", strconv.Itoa(g.Gid), g.Name); err != nil {
 			return err
 		}
 		newgrp := Group{
@@ -59,9 +62,12 @@ func (g *Group) apply(r *run) error {
 		return nil
 	}
 
+	modified := false
+
 	if old.Name != g.Name {
+		modified = true
 		fmt.Printf("~ gid %d (name %s → %s)\n", g.Gid, old.Name, g.Name)
-		if err := printExec("groupmod", "-n", g.Name, old.Name); err != nil {
+		if err := printExec(r, "groupmod", "-n", g.Name, old.Name); err != nil {
 			return err
 		}
 		newgrp := Group{
@@ -82,12 +88,10 @@ func (g *Group) apply(r *run) error {
 				u.Group = g.Name
 			}
 		}
-		return nil
-	}
-
-	if old.Gid != g.Gid {
+	} else if old.Gid != g.Gid {
+		modified = true
 		fmt.Printf("~ group %s (gid %d → %d)\n", g.Name, old.Gid, g.Gid)
-		if err := printExec("groupmod", "-g", strconv.Itoa(g.Gid), g.Name); err != nil {
+		if err := printExec(r, "groupmod", "-g", strconv.Itoa(g.Gid), g.Name); err != nil {
 			return err
 		}
 		newgrp := Group{
@@ -97,6 +101,10 @@ func (g *Group) apply(r *run) error {
 		r.groupCache[g.Name] = &newgrp
 		r.gidCache[g.Gid] = &newgrp
 		delete(r.gidCache, old.Gid)
+	}
+
+	if modified {
+		r.addStat("groups modified")
 	}
 
 	return nil

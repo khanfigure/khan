@@ -3,6 +3,7 @@ package duck
 import (
 	"fmt"
 	"os"
+	"sort"
 )
 
 var (
@@ -35,7 +36,42 @@ func Add(add ...Item) {
 }
 
 func Apply() error {
-	r := &run{}
+	r := &run{
+		stats: map[string]int{},
+	}
+
+	for _, arg := range os.Args[1:] {
+		if arg == "--help" || arg == "-h" {
+			fmt.Fprintf(os.Stderr, `Usage: %s [options]
+
+    -d  --dry      Dry run, don't make any changes
+    -D  --diff     Show full diff of file content changes
+    -v  --verbose  Be more verbose
+
+    -h --help      This text
+
+`, os.Args[0])
+			os.Exit(1)
+		}
+
+		if arg == "-d" || arg == "--dry" {
+			r.dry = true
+		} else if arg == "-D" || arg == "--diff" {
+			r.diff = true
+		} else if arg == "-v" || arg == "--verbose" {
+			r.verbose = true
+		} else {
+			fmt.Fprintf(os.Stderr, "Invalid parameter %#v. Try -h / --help for usage.", arg)
+			os.Exit(1)
+		}
+	}
+
+	if r.dry {
+		fmt.Println("Dry run mode: Nothing will be changed")
+	} else {
+		fmt.Println("Executing changes")
+	}
+	fmt.Println()
 
 	var firsterr error
 	for _, item := range items {
@@ -46,6 +82,17 @@ func Apply() error {
 			}
 		}
 	}
+	fmt.Println("────────────")
+	var keys []string
+	for k := range r.stats {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		v := r.stats[k]
+		fmt.Printf("%-20s %#v\n", k, v)
+	}
+
 	return firsterr
 }
 

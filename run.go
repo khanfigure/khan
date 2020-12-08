@@ -15,11 +15,24 @@ import (
 
 // The context for an execution on a server
 type run struct {
+	dry     bool
+	diff    bool
+	verbose bool
+
+	statsMu sync.Mutex
+	stats   map[string]int
+
 	userCacheMu sync.Mutex
 	userCache   map[string]*User
 	uidCache    map[int]*User
 	groupCache  map[string]*Group
 	gidCache    map[int]*Group
+}
+
+func (r *run) addStat(stat string) {
+	r.statsMu.Lock()
+	r.stats[stat] = r.stats[stat] + 1
+	r.statsMu.Unlock()
 }
 
 // Always lock userCacheMu before calling this
@@ -164,16 +177,21 @@ func readColonFile(path string) ([][]string, error) {
 	return r, bs.Err()
 }
 
-func printExec(c string, args ...string) error {
-	return printExecStdin(nil, c, args...)
+func printExec(r *run, c string, args ...string) error {
+	return printExecStdin(r, nil, c, args...)
 }
 
-func printExecStdin(stdin io.Reader, c string, args ...string) error {
-	fmt.Print(shell.ReadableEscapeArg(c))
-	for _, a := range args {
-		fmt.Print(" " + shell.ReadableEscapeArg(a))
+func printExecStdin(r *run, stdin io.Reader, c string, args ...string) error {
+	if r.verbose {
+		fmt.Print(shell.ReadableEscapeArg(c))
+		for _, a := range args {
+			fmt.Print(" " + shell.ReadableEscapeArg(a))
+		}
+		fmt.Println()
 	}
-	fmt.Println()
+	if r.dry {
+		return nil
+	}
 	cmd := exec.Command(c, args...)
 	cmd.Stdin = stdin
 	cmd.Stdout = os.Stdout
