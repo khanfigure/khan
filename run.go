@@ -27,6 +27,8 @@ type run struct {
 	uidCache    map[int]*User
 	groupCache  map[string]*Group
 	gidCache    map[int]*Group
+
+	assetfn func(string) (io.Reader, error)
 }
 
 func (r *run) addStat(stat string) {

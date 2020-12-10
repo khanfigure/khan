@@ -43,7 +43,7 @@ func build() error {
 	for _, match := range matches {
 		base := filepath.Base(match)
 		goname := base + ".go"
-		if err := yaml2go(match, wd+"/"+goname); err != nil {
+		if err := yaml2go(wd, match, wd+"/"+goname); err != nil {
 			return err
 		}
 	}
@@ -53,12 +53,22 @@ func build() error {
 import (
 	"fmt"
 	"os"
+	"io"
+	"bytes"
 
 	%s %#v
 )
 
+func assetfn(path string) (io.Reader, error) {
+	buf, err := Asset(path)
+	if err != nil {
+		return nil, err
+	}
+	return bytes.NewReader(buf), nil
+}
+
 func main() {
-	if err := %s.Apply(); err != nil {
+	if err := %s.Apply(assetfn); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}

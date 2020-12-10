@@ -2,6 +2,7 @@ package duck
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"sort"
 )
@@ -21,6 +22,13 @@ type Item interface {
 	apply(*run) error
 }
 
+type Validator interface {
+	Validate() error
+}
+type StaticFiler interface {
+	StaticFiles() []string
+}
+
 func Add(add ...Item) {
 	// adding something gives it a unique id
 
@@ -35,9 +43,10 @@ func Add(add ...Item) {
 	}
 }
 
-func Apply() error {
+func Apply(assetfn func(string) (io.Reader, error)) error {
 	r := &run{
-		stats: map[string]int{},
+		assetfn: assetfn,
+		stats:   map[string]int{},
 	}
 
 	for _, arg := range os.Args[1:] {

@@ -3,10 +3,12 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
+	"path/filepath"
 	"reflect"
 	"strconv"
 	"strings"
 
+	"github.com/go-bindata/go-bindata/v3"
 	"github.com/yobert/duck"
 	"gopkg.in/yaml.v3"
 )
@@ -20,6 +22,7 @@ type yamlwalker struct {
 	gobuf    *string
 	imports  map[string]string
 	yamlpath string
+	wd       string
 }
 
 type yamlerror struct {
@@ -35,8 +38,8 @@ func (err yamlerror) Error() string {
 type yamlhandler func(w *yamlwalker, v *yaml.Node) error
 
 var yamlhandlers = map[string]yamlhandler{
-	"file":  yamlhandlerfile,
-	"group": yamlhandlergroup,
+	"file":  yamlsimplehandler(&duck.File{}),
+	"group": yamlsimplehandler(&duck.Group{}),
 	"user":  yamlsimplehandler(&duck.User{}),
 }
 
@@ -89,6 +92,11 @@ func (w *yamlwalker) addimport(pkg, alias string) string {
 }
 
 func (w *yamlwalker) yamlwalk(node *yaml.Node) error {
+	if node.Kind == 0 {
+		// A document with nothing but comments seems to return this
+		return nil
+	}
+
 	if node.Kind != yaml.DocumentNode {
 		return w.nodeErrorf(node, "Expected document: Got %s", yamlkind(node.Kind))
 	}
@@ -103,6 +111,12 @@ func (w *yamlwalker) yamlwalk(node *yaml.Node) error {
 }
 
 func (w *yamlwalker) yamlwalkdoc(node *yaml.Node) error {
+
+	if node.Kind == yaml.ScalarNode && node.Value == "" {
+		// A document with nothing but a --- header seems to return this
+		return nil
+	}
+
 	if node.Kind == yaml.SequenceNode {
 		for _, child := range node.Content {
 			if err := w.yamlwalkdoc(child); err != nil {
@@ -136,8 +150,8 @@ func (w *yamlwalker) yamlwalkdoc(node *yaml.Node) error {
 	return w.nodeErrorf(node, "Expected array or map: Got %s", yamlkind(node.Kind))
 }
 
-func yaml2go(yamlpath, gopath string) error {
-	//fmt.Println(yamlpath, "→", gopath)
+func yaml2go(wd, yamlpath, gopath string) error {
+	fmt.Println(yamlpath, "→", gopath)
 
 	yamlbuf, err := ioutil.ReadFile(yamlpath)
 	if err != nil {
@@ -156,6 +170,7 @@ func yaml2go(yamlpath, gopath string) error {
 		gobuf:    &gobuf,
 		imports:  map[string]string{},
 		yamlpath: yamlpath,
+		wd:       wd,
 	}
 
 	if err := walker.yamlwalk(&root); err != nil {
@@ -266,6 +281,36 @@ func yaml2struct(w *yamlwalker, v *yaml.Node, si interface{}) error {
 		*w.gobuf += "\t"
 	}
 	*w.gobuf += "})\n"
+
+	// Validate struct
+	siv, ok := si.(duck.Validator)
+	if ok {
+		if err := siv.Validate(); err != nil {
+			return w.nodeErrorf(v, "%w", err)
+		}
+	}
+
+	// Include static files into the go binary
+	sif, ok := si.(duck.StaticFiler)
+	if ok {
+		files := sif.StaticFiles()
+		for _, file := range files {
+			file = filepath.Clean(file)
+			c := bindata.NewConfig()
+			c.Input = append(c.Input, bindata.InputConfig{
+				Path:      file,
+				Recursive: false,
+			})
+			c.Package = "main"
+
+			gfn := strings.Replace(file, "/", "_", -1)
+			c.Output = w.wd + "/go_bindata_static_file_" + gfn + ".go"
+			fmt.Println(file, "→", c.Output)
+			if err := bindata.Translate(c); err != nil {
+				return err
+			}
+		}
+	}
 
 	return nil
 }

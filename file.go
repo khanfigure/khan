@@ -2,6 +2,7 @@ package duck
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -12,9 +13,11 @@ import (
 )
 
 type File struct {
-	Path    string
-	Content string
-	User    User
+	Path string
+	User User
+
+	Content  string
+	Template string
 
 	id int
 }
@@ -29,10 +32,39 @@ func (f *File) setID(id int) {
 func (f *File) getID() int {
 	return f.id
 }
+
+func (f *File) Validate() error {
+	if f.Path == "" {
+		return errors.New("File path is required")
+	}
+	if f.Content != "" && f.Template != "" {
+		return errors.New("File content and template cannot both be specified")
+	}
+	return nil
+}
+
+func (f *File) StaticFiles() []string {
+	if f.Template != "" {
+		return []string{f.Template}
+	}
+	return nil
+}
+
 func (f *File) apply(r *run) error {
 	r.addStat("files")
+
+	content := f.Content
+
+	if f.Template != "" {
+		var err error
+		content, err = executeTemplate(r, f.Template)
+		if err != nil {
+			return err
+		}
+	}
+
 	buf, err := ioutil.ReadFile(f.Path)
-	if err == nil && bytes.Compare(buf, []byte(f.Content)) == 0 {
+	if err == nil && bytes.Compare(buf, []byte(content)) == 0 {
 		if r.verbose {
 			fmt.Printf("  %s up to date\n", f.Path)
 		}
@@ -44,6 +76,9 @@ func (f *File) apply(r *run) error {
 		r.addStat("files new")
 	} else {
 		reason := "content"
+		if f.Template != "" {
+			reason += " from template"
+		}
 		if err != nil {
 			reason = err.Error()
 		}
@@ -54,11 +89,11 @@ func (f *File) apply(r *run) error {
 	if r.diff {
 		// This is cute but actually ugly.
 		//dmp := diffmatchpatch.New()
-		//diffs := dmp.DiffMain(string(buf), f.Content, true)
+		//diffs := dmp.DiffMain(string(buf), content, true)
 		//fmt.Println(dmp.DiffPrettyText(diffs))
 		diff := difflib.UnifiedDiff{
 			A:        difflib.SplitLines(string(buf)),
-			B:        difflib.SplitLines(f.Content),
+			B:        difflib.SplitLines(content),
 			FromFile: f.Path,
 			ToFile:   f.Path,
 			Context:  3,
@@ -79,7 +114,7 @@ func (f *File) apply(r *run) error {
 		return err
 	}
 	defer fh.Close()
-	if _, err := fh.Write([]byte(f.Content)); err != nil {
+	if _, err := fh.Write([]byte(content)); err != nil {
 		return err
 	}
 	if err := fh.Close(); err != nil {
