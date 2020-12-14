@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/md5"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -11,21 +12,29 @@ import (
 )
 
 func build() error {
-
-	// enter a private space in /tmp so that we don't clutter the cwd with
-	// generated intermediate crap
+	// Enter a private space in /tmp so that we don't clutter the cwd with
+	// generated intermediate crap. This space will persist: it is based on
+	// the working directory absolute path. This way the go compiler can
+	// optimize multiple runs.
 
 	cwd, err := os.Getwd()
 	if err != nil {
 		return err
 	}
 
-	wd, err := ioutil.TempDir("", "duck")
+	// safe, clean, slow way
+	//	wd, err := ioutil.TempDir("", "duck")
+	//	if err != nil {
+	//		return err
+	//	}
+
+	// more fun way
+	wd, err := stabletmpdir(cwd)
 	if err != nil {
 		return err
 	}
 
-	if err := copyglobs(wd, "*.go", "go.mod", "go.sum"); err != nil {
+	if err := sync(wd, cwd); err != nil {
 		return err
 	}
 
@@ -40,15 +49,34 @@ func build() error {
 	matches = append(matches, matches2...)
 	sort.Strings(matches)
 
+	assetfs := false
+
 	for _, match := range matches {
 		base := filepath.Base(match)
 		goname := base + ".go"
-		if err := yaml2go(wd, match, wd+"/"+goname); err != nil {
+		if err := yaml2go(wd, match, wd+"/"+goname, &assetfs); err != nil {
 			return err
 		}
 	}
 
 	if _, err := os.Stat(wd + "/main.go"); err != nil {
+
+		var assetfn = `func assetfn(path string) (io.Reader, error) {
+	buf, err := Asset(path)
+	if err != nil {
+		return nil, err
+	}
+	return bytes.NewReader(buf), nil
+}
+`
+		if !assetfs {
+			assetfn = `func assetfn(path string) (io.Reader, error) {
+	_ = bytes.NewReader
+	return nil, os.ErrNotExist
+}
+`
+		}
+
 		if err := ioutil.WriteFile(wd+"/main.go", []byte(fmt.Sprintf(`package main
 import (
 	"fmt"
@@ -58,22 +86,14 @@ import (
 
 	%s %#v
 )
-
-func assetfn(path string) (io.Reader, error) {
-	buf, err := Asset(path)
-	if err != nil {
-		return nil, err
-	}
-	return bytes.NewReader(buf), nil
-}
-
+%s
 func main() {
 	if err := %s.Apply(assetfn); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
-`, duckpkgalias, duckpkgname, duckpkgalias)), 0644); err != nil {
+`, duckpkgalias, duckpkgname, assetfn, duckpkgalias)), 0644); err != nil {
 			return err
 		}
 	}
@@ -86,9 +106,23 @@ func main() {
 		return err
 	}
 
-	// not in defer on purpose: I don't want to clean up the build folder
-	// when there is an error for now, so I can debug.
-	return os.RemoveAll(wd)
+	// Copy back out files that go often changes
+	for _, p := range []string{"go.sum", "go.mod"} {
+		if _, err := os.Stat(cwd + "/" + p); err == nil {
+			err = compare(cwd+"/"+p, wd+"/"+p)
+			if err == nil {
+				continue
+			}
+			if err == errNotSame {
+				if err := cp(cwd+"/"+p, wd+"/"+p); err != nil {
+					return err
+				}
+			}
+			return err
+		}
+	}
+
+	return nil
 }
 
 func copyglobs(dest string, globs ...string) error {
@@ -121,4 +155,25 @@ func copyglobs(dest string, globs ...string) error {
 		}
 	}
 	return nil
+}
+
+func stabletmpdir(srcpath string) (string, error) {
+	p, err := filepath.EvalSymlinks(srcpath)
+	if err != nil {
+		return "", err
+	}
+
+	h := fmt.Sprintf("%x", md5.Sum([]byte(p)))
+	r := "/tmp/duck_" + h[:8]
+
+	info, err := os.Stat(r)
+	if err == nil && info.IsDir() {
+		return r, nil
+	}
+
+	fmt.Println("mkdir", r)
+	if err := os.Mkdir(r, 0700); err != nil {
+		return "", err
+	}
+	return r, nil
 }

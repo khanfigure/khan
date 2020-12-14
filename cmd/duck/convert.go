@@ -19,7 +19,9 @@ const (
 )
 
 type yamlwalker struct {
-	gobuf    *string
+	gobuf   *string
+	assetfs *bool
+
 	imports  map[string]string
 	yamlpath string
 	wd       string
@@ -150,7 +152,7 @@ func (w *yamlwalker) yamlwalkdoc(node *yaml.Node) error {
 	return w.nodeErrorf(node, "Expected array or map: Got %s", yamlkind(node.Kind))
 }
 
-func yaml2go(wd, yamlpath, gopath string) error {
+func yaml2go(wd, yamlpath, gopath string, assetfs *bool) error {
 	fmt.Println(yamlpath, "→", gopath)
 
 	yamlbuf, err := ioutil.ReadFile(yamlpath)
@@ -168,6 +170,7 @@ func yaml2go(wd, yamlpath, gopath string) error {
 
 	walker := &yamlwalker{
 		gobuf:    &gobuf,
+		assetfs:  assetfs,
 		imports:  map[string]string{},
 		yamlpath: yamlpath,
 		wd:       wd,
@@ -309,6 +312,7 @@ func yaml2struct(w *yamlwalker, v *yaml.Node, si interface{}) error {
 			if err := bindata.Translate(c); err != nil {
 				return err
 			}
+			*w.assetfs = true
 		}
 	}
 
