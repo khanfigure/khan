@@ -18,9 +18,7 @@ type run struct {
 	dry     bool
 	diff    bool
 	verbose bool
-
-	statsMu sync.Mutex
-	stats   map[string]int
+	ssh     string
 
 	userCacheMu sync.Mutex
 	userCache   map[string]*User
@@ -29,13 +27,15 @@ type run struct {
 	gidCache    map[int]*Group
 
 	assetfn func(string) (io.Reader, error)
+
+	out *outputter
 }
 
-func (r *run) addStat(stat string) {
+/*func (r *run) addStat(stat string) {
 	r.statsMu.Lock()
 	r.stats[stat] = r.stats[stat] + 1
 	r.statsMu.Unlock()
-}
+}*/
 
 // Always lock userCacheMu before calling this
 func (r *run) reloadUserGroupCache() error {

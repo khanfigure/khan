@@ -38,7 +38,8 @@ func (f *File) Validate() error {
 		return errors.New("File path is required")
 	}
 	if f.Content != "" && f.Template != "" {
-		return errors.New("File content and template cannot both be specified")
+		//return errors.New("File content and template cannot both be specified")
+		return fmt.Errorf("File content and template cannot both be specified (%#v %#v)", f.Content, f.Template)
 	}
 	return nil
 }
@@ -51,8 +52,6 @@ func (f *File) StaticFiles() []string {
 }
 
 func (f *File) apply(r *run) error {
-	r.addStat("files")
-
 	content := f.Content
 
 	if f.Template != "" {
@@ -65,15 +64,10 @@ func (f *File) apply(r *run) error {
 
 	buf, err := ioutil.ReadFile(f.Path)
 	if err == nil && bytes.Compare(buf, []byte(content)) == 0 {
-		if r.verbose {
-			fmt.Printf("  %s up to date\n", f.Path)
-		}
-		r.addStat("files up to date")
-		return nil
+		return ErrUnchanged
 	}
 	if err != nil && iserrnotfound(err) {
-		fmt.Printf("+ %s\n", f.Path)
-		r.addStat("files new")
+		//fmt.Printf("+ %s\n", f.Path)
 	} else {
 		reason := "content"
 		if f.Template != "" {
@@ -82,8 +76,7 @@ func (f *File) apply(r *run) error {
 		if err != nil {
 			reason = err.Error()
 		}
-		fmt.Printf("~ %s (%s)\n", f.Path, reason)
-		r.addStat("files content changed")
+		//fmt.Printf("~ %s (%s)\n", f.Path, reason)
 	}
 
 	if r.diff {

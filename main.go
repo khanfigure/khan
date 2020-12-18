@@ -1,139 +1,80 @@
 package duck
 
 import (
+	"flag"
 	"fmt"
-	"io"
 	"os"
-	"sort"
+	"strings"
 )
 
 var (
-	nextid int
-	items  []Item
+	describe     string
+	sourceprefix string
 )
 
-type Package struct {
-	Name string
+func SetSourcePrefix(s string) {
+	sourceprefix = s
+}
+func SetDescribe(s string) {
+	describe = s
 }
 
-type Item interface {
-	setID(id int)
-	getID() int
-	apply(*run) error
-}
-
-type Validator interface {
-	Validate() error
-}
-type StaticFiler interface {
-	StaticFiles() []string
-}
-
-func Add(add ...Item) {
-	// adding something gives it a unique id
-
-	for _, item := range add {
-		if item.getID() != 0 {
-			// already added
-			continue
-		}
-		nextid++
-		item.setID(nextid)
-		items = append(items, item)
-	}
-}
-
-func Apply(assetfn func(string) (io.Reader, error)) error {
+func Apply() error {
 	r := &run{
-		assetfn: assetfn,
-		stats:   map[string]int{},
+		assetfn: mainassetfn,
 	}
 
-	for _, arg := range os.Args[1:] {
-		if arg == "--help" || arg == "-h" {
-			fmt.Fprintf(os.Stderr, `Usage: %s [options]
+	flag.BoolVar(&r.dry, "d", false, "Dry run; Don't make any changes")
+	flag.BoolVar(&r.diff, "D", false, "Show full diff of file content changes")
+	flag.BoolVar(&r.verbose, "v", false, "Be more verbose")
 
-    -d  --dry      Dry run, don't make any changes
-    -D  --diff     Show full diff of file content changes
-    -v  --verbose  Be more verbose
+	flag.StringVar(&r.ssh, "ssh", "", "SSH mode connection string (host, user@host, or user@host:port)")
 
-    -h --help      This text
+	flag.Parse()
 
-`, os.Args[0])
-			os.Exit(1)
-		}
-
-		if arg == "-d" || arg == "--dry" {
-			r.dry = true
-		} else if arg == "-D" || arg == "--diff" {
-			r.diff = true
-		} else if arg == "-v" || arg == "--verbose" {
-			r.verbose = true
-		} else {
-			fmt.Fprintf(os.Stderr, "Invalid parameter %#v. Try -h / --help for usage.", arg)
-			os.Exit(1)
-		}
-	}
+	title := "░░░ Configuration " + brightcolor(Yellow) + describe + reset() + " "
 
 	if r.dry {
-		fmt.Println("Dry run mode: Nothing will be changed")
+		title += color(Green) + "dry running"
 	} else {
-		fmt.Println("Executing changes")
+		title += color(Red) + "executing"
 	}
-	fmt.Println()
+	title += reset()
+	if r.ssh == "" {
+		hostname, err := os.Hostname()
+		if err != nil {
+			return err
+		}
+		title += " " + hostname
+	} else {
+		title += " " + r.ssh
+	}
+	title += " ░░░"
+	fmt.Println(title)
 
-	var firsterr error
+	out := &outputter{}
+	r.out = out
+
 	for _, item := range items {
-		if err := item.apply(r); err != nil {
-			fmt.Fprintln(os.Stderr, item, err)
-			if firsterr == nil {
-				firsterr = err
-			}
+		out.StartItem(item)
+
+		err := item.apply(r)
+
+		out.FinishItem(item, err)
+
+		if err == ErrUnchanged {
+			err = nil
+		}
+
+		if err != nil {
+			md := meta[item.getID()]
+
+			// wrap the error with its source
+			err = fmt.Errorf("%s %w", strings.TrimPrefix(md.source, sourceprefix+"/"), err)
+
+			return err
 		}
 	}
-	fmt.Println("────────────")
-	var keys []string
-	for k := range r.stats {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	for _, k := range keys {
-		v := r.stats[k]
-		fmt.Printf("%-20s %#v\n", k, v)
-	}
 
-	return firsterr
-}
-
-/*func Main(items ...Item) {
-	exit := 0
-	for _, item := range items {
-		if err := apply(item); err != nil {
-			fmt.Println(err)
-			exit = 1
-		}
-	}
-	os.Exit(exit)
-}
-
-func apply(item Item) error {
-	switch v := item.(type) {
-	case []Item:
-		for _, i := range v {
-			if err := apply(i); err != nil {
-				return err
-			}
-		}
-	case File:
-		fmt.Println("setting", v.Path, "to", v.Content)
-	case User:
-		fmt.Println("creating unix user", v.Name)
-	case Group:
-		fmt.Println("creating unix group", v.Name)
-	case Package:
-		fmt.Println("installing package", v.Name)
-	default:
-		return fmt.Errorf("Unhandled item type %T", item)
-	}
 	return nil
-}*/
+}

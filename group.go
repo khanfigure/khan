@@ -30,8 +30,6 @@ func (g *Group) getID() int {
 }
 
 func (g *Group) apply(r *run) error {
-	r.addStat("groups")
-
 	r.userCacheMu.Lock()
 	defer r.userCacheMu.Unlock()
 
@@ -48,7 +46,6 @@ func (g *Group) apply(r *run) error {
 	}
 
 	if old == nil {
-		r.addStat("groups new")
 		fmt.Printf("+ group %s (gid %d)\n", g.Name, g.Gid)
 		if err := printExec(r, "groupadd", "-g", strconv.Itoa(g.Gid), g.Name); err != nil {
 			return err
@@ -104,7 +101,6 @@ func (g *Group) apply(r *run) error {
 	}
 
 	if modified {
-		r.addStat("groups modified")
 	}
 
 	return nil

@@ -9,9 +9,26 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strings"
+
+	"github.com/go-bindata/go-bindata/v3"
 )
 
+type buildrun struct {
+	staticfiles []string
+	wd          string
+	cwd         string
+}
+
 func build() error {
+
+	cmd := exec.Command("git", "describe", "--all", "--long", "--dirty")
+	cmd.Stderr = os.Stderr
+	describe, err := cmd.Output()
+	if err != nil {
+		return err
+	}
+
 	// Enter a private space in /tmp so that we don't clutter the cwd with
 	// generated intermediate crap. This space will persist: it is based on
 	// the working directory absolute path. This way the go compiler can
@@ -34,6 +51,15 @@ func build() error {
 		return err
 	}
 
+	outfile := "execute"
+
+	br := &buildrun{
+		wd:  wd,
+		cwd: cwd,
+	}
+
+	fmt.Println("Building", wd, "→", outfile)
+
 	if err := sync(wd, cwd); err != nil {
 		return err
 	}
@@ -54,28 +80,35 @@ func build() error {
 	for _, match := range matches {
 		base := filepath.Base(match)
 		goname := base + ".go"
-		if err := yaml2go(wd, match, wd+"/"+goname, &assetfs); err != nil {
+		if err := br.yaml2go(wd, match, wd+"/"+goname, &assetfs); err != nil {
 			return err
 		}
 	}
 
-	if _, err := os.Stat(wd + "/main.go"); err != nil {
-
-		var assetfn = `func assetfn(path string) (io.Reader, error) {
-	buf, err := Asset(path)
-	if err != nil {
-		return nil, err
-	}
-	return bytes.NewReader(buf), nil
-}
-`
-		if !assetfs {
-			assetfn = `func assetfn(path string) (io.Reader, error) {
-	_ = bytes.NewReader
-	return nil, os.ErrNotExist
-}
-`
+	bc := bindata.NewConfig()
+	bc.Output = br.wd + "/go_bindata_static_files.go"
+	bc.Package = "main"
+	staticfiledups := map[string]bool{}
+	if len(br.staticfiles) > 0 {
+		for _, file := range br.staticfiles {
+			file = filepath.Clean(file)
+			if staticfiledups[file] {
+				continue
+			}
+			staticfiledups[file] = true
+			bc.Input = append(bc.Input, bindata.InputConfig{
+				Path:      file,
+				Recursive: false,
+			})
 		}
+		fmt.Println("Bundling", len(br.staticfiles), "static files ...")
+	}
+
+	if err := bindata.Translate(bc); err != nil {
+		return err
+	}
+
+	if _, err := os.Stat(wd + "/main.go"); err != nil {
 
 		if err := ioutil.WriteFile(wd+"/main.go", []byte(fmt.Sprintf(`package main
 import (
@@ -86,19 +119,33 @@ import (
 
 	%s %#v
 )
-%s
+
+func assetfn(path string) (io.Reader, error) {
+	buf, err := Asset(path)
+	if err != nil {
+		return nil, err
+	}
+	return bytes.NewReader(buf), nil
+}
+
 func main() {
-	if err := %s.Apply(assetfn); err != nil {
+	%s.SetSourcePrefix(%#v)
+	%s.SetDescribe(%#v)
+	%s.SetAssetLoader(assetfn)
+
+	if err := %s.Apply(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
-`, duckpkgalias, duckpkgname, assetfn, duckpkgalias)), 0644); err != nil {
+`, duckpkgalias, duckpkgname, duckpkgalias, wd, duckpkgalias, strings.TrimSpace(string(describe)), duckpkgalias, duckpkgalias)), 0644); err != nil {
 			return err
 		}
 	}
 
-	cmd := exec.Command("go", "build", "-o", cwd+"/duck")
+	fmt.Println("Compiling ...")
+
+	cmd = exec.Command("go", "build", "-o", cwd+"/"+outfile)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Dir = wd
@@ -171,7 +218,7 @@ func stabletmpdir(srcpath string) (string, error) {
 		return r, nil
 	}
 
-	fmt.Println("mkdir", r)
+	//fmt.Println("mkdir", r)
 	if err := os.Mkdir(r, 0700); err != nil {
 		return "", err
 	}

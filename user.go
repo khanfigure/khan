@@ -53,8 +53,6 @@ func (u *User) getID() int {
 	return u.id
 }
 func (u *User) apply(r *run) error {
-	r.addStat("users")
-
 	r.userCacheMu.Lock()
 	defer r.userCacheMu.Unlock()
 
@@ -78,7 +76,6 @@ func (u *User) apply(r *run) error {
 	modified := false
 
 	if old == nil {
-		r.addStat("users new")
 		fmt.Printf("+ user %s (group %s)\n", u.Name, usergroup)
 		args := []string{"-g", usergroup, "-u", strconv.Itoa(u.Uid), u.Name}
 		if u.Gecos != "" {
@@ -190,7 +187,6 @@ func (u *User) apply(r *run) error {
 	}
 
 	if modified {
-		r.addStat("users modified")
 	}
 
 	return nil

@@ -3,12 +3,10 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
-	"path/filepath"
 	"reflect"
 	"strconv"
 	"strings"
 
-	"github.com/go-bindata/go-bindata/v3"
 	"github.com/yobert/duck"
 	"gopkg.in/yaml.v3"
 )
@@ -19,6 +17,8 @@ const (
 )
 
 type yamlwalker struct {
+	br *buildrun
+
 	gobuf   *string
 	assetfs *bool
 
@@ -152,8 +152,8 @@ func (w *yamlwalker) yamlwalkdoc(node *yaml.Node) error {
 	return w.nodeErrorf(node, "Expected array or map: Got %s", yamlkind(node.Kind))
 }
 
-func yaml2go(wd, yamlpath, gopath string, assetfs *bool) error {
-	fmt.Println(yamlpath, "→", gopath)
+func (br *buildrun) yaml2go(wd, yamlpath, gopath string, assetfs *bool) error {
+	//fmt.Println(yamlpath, "→", gopath)
 
 	yamlbuf, err := ioutil.ReadFile(yamlpath)
 	if err != nil {
@@ -169,6 +169,7 @@ func yaml2go(wd, yamlpath, gopath string, assetfs *bool) error {
 	gobuf := "func init() {\n"
 
 	walker := &yamlwalker{
+		br:       br,
 		gobuf:    &gobuf,
 		assetfs:  assetfs,
 		imports:  map[string]string{},
@@ -199,7 +200,7 @@ func yaml2go(wd, yamlpath, gopath string, assetfs *bool) error {
 	return nil
 }
 
-func yaml2struct(w *yamlwalker, v *yaml.Node, si interface{}) error {
+func (br *buildrun) yaml2struct(w *yamlwalker, v *yaml.Node, si interface{}) error {
 	if v.Kind != yaml.MappingNode {
 		return w.nodeErrorf(v, "Expected map: Got %s", yamlkind(v.Kind))
 	}
@@ -210,7 +211,13 @@ func yaml2struct(w *yamlwalker, v *yaml.Node, si interface{}) error {
 
 	val := reflect.ValueOf(si)
 	typ := val.Type()
-	if typ.Kind() == reflect.Ptr {
+
+	for typ.Kind() == reflect.Ptr {
+		// zero out what it points to so we don't have danglings from the last yaml2struct call
+		z := reflect.Zero(typ.Elem())
+		val.Elem().Set(z)
+
+		// dereference
 		val = val.Elem()
 		typ = val.Type()
 	}
@@ -236,8 +243,10 @@ func yaml2struct(w *yamlwalker, v *yaml.Node, si interface{}) error {
 		}
 	}
 
+	source := fmt.Sprintf("%s:%d", w.yamlpath, v.Line)
+
 	duckalias := w.addimport(duckpkgname, duckpkgalias)
-	*w.gobuf += fmt.Sprintf("\t%s.Add(&%s.%s{", duckalias, duckalias, typ.Name())
+	*w.gobuf += fmt.Sprintf("\t%s.AddFromSource(%#v, &%s.%s{", duckalias, source, duckalias, typ.Name())
 	any := false
 	alreadyset := map[string]bool{}
 
@@ -298,21 +307,7 @@ func yaml2struct(w *yamlwalker, v *yaml.Node, si interface{}) error {
 	if ok {
 		files := sif.StaticFiles()
 		for _, file := range files {
-			file = filepath.Clean(file)
-			c := bindata.NewConfig()
-			c.Input = append(c.Input, bindata.InputConfig{
-				Path:      file,
-				Recursive: false,
-			})
-			c.Package = "main"
-
-			gfn := strings.Replace(file, "/", "_", -1)
-			c.Output = w.wd + "/go_bindata_static_file_" + gfn + ".go"
-			fmt.Println(file, "→", c.Output)
-			if err := bindata.Translate(c); err != nil {
-				return err
-			}
-			*w.assetfs = true
+			br.staticfiles = append(br.staticfiles, file)
 		}
 	}
 
@@ -375,9 +370,9 @@ func yaml2value(w *yamlwalker, v *yaml.Node, dest reflect.Value) error {
 	return nil
 }
 
-func yamlsimplehandler(vv interface{}) yamlhandler {
+func yamlsimplehandler(vv duck.Item) yamlhandler {
 	return func(w *yamlwalker, v *yaml.Node) error {
-		if err := yaml2struct(w, v, vv); err != nil {
+		if err := w.br.yaml2struct(w, v, vv); err != nil {
 			return err
 		}
 		return nil

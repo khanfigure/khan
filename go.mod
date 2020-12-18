@@ -7,5 +7,6 @@ require (
 	github.com/go-bindata/go-bindata/v3 v3.1.3
 	github.com/keegancsmith/shell v0.0.0-20160208231706-ccb53e0c7c5c
 	github.com/pmezard/go-difflib v1.0.0
+	golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2
 	gopkg.in/yaml.v3 v3.0.0-20200615113413-eeeca48fe776
 )

@@ -50,7 +50,7 @@ func sync(dest, src string) error {
 			if desterr == nil && destinfo.IsDir() {
 				return nil
 			}
-			fmt.Println("mkdir", destp)
+			//fmt.Println("mkdir", destp)
 			return os.Mkdir(destp, 0700)
 		}
 
@@ -185,7 +185,7 @@ func compare(p1, p2 string) error {
 }
 
 func cp(dest, src string) error {
-	fmt.Println("copying", src, "→", dest)
+	//fmt.Println("copying", src, "→", dest)
 	destfh, err := os.OpenFile(dest, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return err
