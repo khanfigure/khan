@@ -55,25 +55,28 @@ func Apply() error {
 	out := &outputter{}
 	r.out = out
 
+	total := len(items)
+	finished := 0
+
+	defer func() {
+		fmt.Printf("%d/%d things up to date\n", finished, total)
+	}()
+
 	for _, item := range items {
-		out.StartItem(item)
+		out.StartItem(r, item)
 
-		err := item.apply(r)
+		status, err := item.apply(r)
 
-		out.FinishItem(item, err)
-
-		if err == ErrUnchanged {
-			err = nil
-		}
+		out.FinishItem(r, item, status, err)
 
 		if err != nil {
-			md := meta[item.getID()]
-
 			// wrap the error with its source
+			md := meta[item.getID()]
 			err = fmt.Errorf("%s %w", strings.TrimPrefix(md.source, sourceprefix+"/"), err)
-
 			return err
 		}
+
+		finished++
 	}
 
 	return nil

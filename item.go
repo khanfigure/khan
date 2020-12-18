@@ -1,7 +1,6 @@
 package duck
 
 import (
-	"errors"
 	"fmt"
 	"runtime"
 )
@@ -14,14 +13,37 @@ var (
 	nextid int
 	items  []Item
 	meta   map[int]*metadata
-
-	ErrUnchanged = errors.New("unchanged")
 )
+
+type itemStatus int
+
+const (
+	invalidItemStatus itemStatus = iota
+	itemUnchanged
+	itemCreated
+	itemModified
+	itemDeleted
+)
+
+func (s itemStatus) String() string {
+	switch s {
+	case itemUnchanged:
+		return "unchanged"
+	case itemCreated:
+		return "created"
+	case itemModified:
+		return "modified"
+	case itemDeleted:
+		return "deleted"
+	default:
+		return fmt.Sprintf("invalidItemStatus(%d)", s)
+	}
+}
 
 type Item interface {
 	setID(id int)
 	getID() int
-	apply(*run) error
+	apply(*run) (itemStatus, error)
 	String() string
 }
 

@@ -19,6 +19,8 @@ type File struct {
 	Content  string
 	Template string
 
+	Delete bool
+
 	id int
 }
 
@@ -37,6 +39,9 @@ func (f *File) Validate() error {
 	if f.Path == "" {
 		return errors.New("File path is required")
 	}
+	if f.Delete && (f.Content != "" || f.Template != "") {
+		return fmt.Errorf("File remove: true conflicts with content or template")
+	}
 	if f.Content != "" && f.Template != "" {
 		//return errors.New("File content and template cannot both be specified")
 		return fmt.Errorf("File content and template cannot both be specified (%#v %#v)", f.Content, f.Template)
@@ -51,32 +56,44 @@ func (f *File) StaticFiles() []string {
 	return nil
 }
 
-func (f *File) apply(r *run) error {
-	content := f.Content
+func (f *File) apply(r *run) (itemStatus, error) {
+	var status itemStatus
 
+	if f.Delete {
+		_, err := os.Stat(f.Path)
+		if err != nil && iserrnotfound(err) {
+			return itemUnchanged, nil
+		}
+		status = itemDeleted
+
+		if r.dry {
+			return status, nil
+		}
+		return status, os.Remove(f.Path)
+	}
+
+	content := f.Content
 	if f.Template != "" {
 		var err error
 		content, err = executeTemplate(r, f.Template)
 		if err != nil {
-			return err
+			return status, err
 		}
 	}
 
 	buf, err := ioutil.ReadFile(f.Path)
 	if err == nil && bytes.Compare(buf, []byte(content)) == 0 {
-		return ErrUnchanged
+		return itemUnchanged, nil
 	}
 	if err != nil && iserrnotfound(err) {
-		//fmt.Printf("+ %s\n", f.Path)
+		status = itemCreated
 	} else {
-		reason := "content"
-		if f.Template != "" {
-			reason += " from template"
-		}
+		status = itemModified
 		if err != nil {
-			reason = err.Error()
+			if r.verbose {
+				fmt.Printf("Error reading %#v: %v\n", f.Path, err)
+			}
 		}
-		//fmt.Printf("~ %s (%s)\n", f.Path, reason)
 	}
 
 	if r.diff {
@@ -93,27 +110,27 @@ func (f *File) apply(r *run) error {
 		}
 		difftxt, err := difflib.GetUnifiedDiffString(diff)
 		if err != nil {
-			return err
+			return status, err
 		}
 		fmt.Print(difftxt)
 	}
 
 	if r.dry {
-		return nil
+		return status, nil
 	}
 
 	fh, err := os.Create(f.Path)
 	if err != nil {
-		return err
+		return status, err
 	}
 	defer fh.Close()
 	if _, err := fh.Write([]byte(content)); err != nil {
-		return err
+		return status, err
 	}
 	if err := fh.Close(); err != nil {
-		return err
+		return status, err
 	}
-	return nil
+	return status, nil
 }
 
 func iserrnotfound(err error) bool {
