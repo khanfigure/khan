@@ -3,8 +3,14 @@ package duck
 import (
 	"flag"
 	"fmt"
+	"net"
 	"os"
 	"strings"
+
+	"github.com/desops/sshpool"
+	"github.com/yobert/duck/rio"
+	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/agent"
 )
 
 var (
@@ -24,12 +30,13 @@ func Apply() error {
 		assetfn: mainassetfn,
 	}
 
+	r.rioconfig = &rio.Config{}
+
 	flag.BoolVar(&r.dry, "d", false, "Dry run; Don't make any changes")
 	flag.BoolVar(&r.diff, "D", false, "Show full diff of file content changes")
 	flag.BoolVar(&r.verbose, "v", false, "Be more verbose")
 
-	// not implemented yet
-	//flag.StringVar(&r.ssh, "ssh", "", "SSH mode connection string (host, user@host, or user@host:port)")
+	flag.StringVar(&r.ssh, "ssh", "", "SSH mode connection string (host, user@host, or user@host:port)")
 
 	flag.Parse()
 
@@ -52,6 +59,26 @@ func Apply() error {
 	}
 	title += " ░░░"
 	fmt.Println(title)
+
+	if r.ssh != "" {
+		socket := os.Getenv("SSH_AUTH_SOCK")
+		conn, err := net.Dial("unix", socket)
+		if err != nil {
+			return fmt.Errorf("Failed to open SSH_AUTH_SOCK: %w", err)
+		}
+		agentClient := agent.NewClient(conn)
+		sshconfig := &ssh.ClientConfig{
+			User: os.Getenv("USER"),
+			Auth: []ssh.AuthMethod{
+				ssh.PublicKeysCallback(agentClient.Signers),
+			},
+			HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+				// TODO
+				return nil
+			},
+		}
+		r.rioconfig.Pool = sshpool.New(sshconfig, &sshpool.PoolConfig{Debug: r.verbose})
+	}
 
 	out := &outputter{}
 	r.out = out

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"syscall"
 
@@ -60,7 +59,7 @@ func (f *File) apply(r *run) (itemStatus, error) {
 	var status itemStatus
 
 	if f.Delete {
-		_, err := os.Stat(f.Path)
+		_, err := r.rioconfig.Stat(r.ssh, true, f.Path)
 		if err != nil && iserrnotfound(err) {
 			return itemUnchanged, nil
 		}
@@ -81,7 +80,7 @@ func (f *File) apply(r *run) (itemStatus, error) {
 		}
 	}
 
-	buf, err := ioutil.ReadFile(f.Path)
+	buf, err := r.rioconfig.ReadFile(r.ssh, true, f.Path)
 	if err == nil && bytes.Compare(buf, []byte(content)) == 0 {
 		return itemUnchanged, nil
 	}
@@ -119,7 +118,7 @@ func (f *File) apply(r *run) (itemStatus, error) {
 		return status, nil
 	}
 
-	fh, err := os.Create(f.Path)
+	fh, err := r.rioconfig.Create(r.ssh, true, f.Path)
 	if err != nil {
 		return status, err
 	}

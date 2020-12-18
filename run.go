@@ -2,13 +2,15 @@ package duck
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/yobert/duck/rio"
 
 	"github.com/keegancsmith/shell"
 )
@@ -19,6 +21,8 @@ type run struct {
 	diff    bool
 	verbose bool
 	ssh     string
+
+	rioconfig *rio.Config
 
 	userCacheMu sync.Mutex
 	userCache   map[string]*User
@@ -46,7 +50,7 @@ func (r *run) reloadUserGroupCache() error {
 
 	userGids := map[string]int{}
 
-	u_rows, err := readColonFile("/etc/passwd")
+	u_rows, err := readColonFile(r, "/etc/passwd")
 	if err != nil {
 		return err
 	}
@@ -82,7 +86,7 @@ func (r *run) reloadUserGroupCache() error {
 		r.uidCache[u.Uid] = &u
 	}
 
-	sh_rows, err := readColonFile("/etc/shadow")
+	sh_rows, err := readColonFile(r, "/etc/shadow")
 	if err != nil {
 		return err
 	}
@@ -107,7 +111,7 @@ func (r *run) reloadUserGroupCache() error {
 		// TODO fancy /etc/shadow fields
 	}
 
-	g_rows, err := readColonFile("/etc/group")
+	g_rows, err := readColonFile(r, "/etc/group")
 	if err != nil {
 		return err
 	}
@@ -151,14 +155,14 @@ func (r *run) reloadUserGroupCache() error {
 	return nil
 }
 
-func readColonFile(path string) ([][]string, error) {
-	fh, err := os.Open(path)
+func readColonFile(r *run, path string) ([][]string, error) {
+	fh, err := r.rioconfig.Open(r.ssh, true, path)
 	if err != nil {
 		return nil, err
 	}
 	defer fh.Close()
 
-	var r [][]string
+	var ret [][]string
 	bs := bufio.NewScanner(fh)
 	for bs.Scan() {
 		line := bs.Text()
@@ -174,9 +178,9 @@ func readColonFile(path string) ([][]string, error) {
 		for i, v := range vals {
 			vals[i] = strings.TrimSpace(v)
 		}
-		r = append(r, vals)
+		ret = append(ret, vals)
 	}
-	return r, bs.Err()
+	return ret, bs.Err()
 }
 
 func printExec(r *run, c string, args ...string) error {
@@ -194,7 +198,7 @@ func printExecStdin(r *run, stdin io.Reader, c string, args ...string) error {
 	if r.dry {
 		return nil
 	}
-	cmd := exec.Command(c, args...)
+	cmd := r.rioconfig.Command(context.Background(), r.ssh, c, args...)
 	cmd.Stdin = stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
