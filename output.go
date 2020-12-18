@@ -15,7 +15,7 @@ func (o *outputter) StartItem(r *run, item Item) {
 }
 
 func (o *outputter) FinishItem(r *run, item Item, status itemStatus, err error) {
-	if status == itemUnchanged && !r.verbose {
+	if err == nil && status == itemUnchanged && !r.verbose {
 		return
 	}
 
@@ -28,7 +28,12 @@ func (o *outputter) FinishItem(r *run, item Item, status itemStatus, err error) 
 
 	typ := strings.ToLower(strings.TrimPrefix(fmt.Sprintf("%T", item), "*duck."))
 
-	fmt.Printf("%s%8s%s │ %-10s │ %-10s │ %s\n", dc, ds, reset(), typ, status, item.String())
+	s := status.String()
+	if err != nil {
+		s = "error"
+	}
+
+	fmt.Printf("%s%8s%s │ %-10s │ %-10s │ %s\n", dc, ds, reset(), typ, s, item.String())
 }
 
 func (o *outputter) Flush() {

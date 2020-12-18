@@ -28,16 +28,17 @@ func Apply() error {
 	flag.BoolVar(&r.diff, "D", false, "Show full diff of file content changes")
 	flag.BoolVar(&r.verbose, "v", false, "Be more verbose")
 
-	flag.StringVar(&r.ssh, "ssh", "", "SSH mode connection string (host, user@host, or user@host:port)")
+	// not implemented yet
+	//flag.StringVar(&r.ssh, "ssh", "", "SSH mode connection string (host, user@host, or user@host:port)")
 
 	flag.Parse()
 
 	title := "░░░ Configuration " + brightcolor(Yellow) + describe + reset() + " "
 
 	if r.dry {
-		title += color(Green) + "dry running"
+		title += color(Green) + "dry run"
 	} else {
-		title += color(Red) + "executing"
+		title += color(Red) + "execute"
 	}
 	title += reset()
 	if r.ssh == "" {

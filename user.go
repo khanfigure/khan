@@ -9,27 +9,27 @@ import (
 )
 
 type User struct {
-	Name string `duck:"name"`
+	Name string
 
 	// Primary group. If not specified, user name is used
-	Group string `duck:"group"`
+	Group string
 
-	Uid int `duck:"uid"`
+	Uid int
 
 	// Supplemental groups
-	Groups []string `duck:"groups"`
+	Groups []string
 
-	Gecos string `duck:"gecos"`
+	Gecos string
 
-	Home  string `duck:"home"`
-	Shell string `duck:"shell"`
+	Home  string
+	Shell string
 
 	// Password is the passord encrypted with libcrypt.
 	// Password if blank will actually be set to "!". If "!", "!!", or "x" are found
 	// in /etc/shadow, it will be translated to a blank password. If you want an actually
 	// blank password (not safe) use BlankPassword: true (blank_password: true in yaml).
-	Password      string `duck:"password"`
-	BlankPassword bool   `duck:"blank_password"`
+	Password      string
+	BlankPassword bool `duck:"blank_password"`
 
 	// TODO fancy /etc/shadow fields
 
@@ -39,11 +39,13 @@ type User struct {
 	//    UidPrimary false: usermod -u (uid) is used if you change the uid of the user
 	UidPrimary bool `duck:"uid_primary"`
 
+	Delete bool
+
 	id int
 }
 
 func (u *User) String() string {
-	return fmt.Sprintf("user %s/%d", u.Name, u.Uid)
+	return fmt.Sprintf("%s/%d", u.Name, u.Uid)
 }
 
 func (u *User) setID(id int) {
@@ -55,9 +57,6 @@ func (u *User) getID() int {
 func (u *User) apply(r *run) (itemStatus, error) {
 	r.userCacheMu.Lock()
 	defer r.userCacheMu.Unlock()
-
-	created := false
-	modified := false
 
 	if err := r.reloadUserGroupCache(); err != nil {
 		return 0, err
@@ -75,6 +74,21 @@ func (u *User) apply(r *run) (itemStatus, error) {
 	} else {
 		old = r.userCache[u.Name]
 	}
+
+	if u.Delete {
+		if old == nil {
+			return itemUnchanged, nil
+		}
+		if err := printExec(r, "userdel", old.Name); err != nil {
+			return 0, err
+		}
+		delete(r.userCache, old.Name)
+		delete(r.uidCache, old.Uid)
+		return itemDeleted, nil
+	}
+
+	created := false
+	modified := false
 
 	if old == nil {
 		//fmt.Printf("+ user %s (group %s)\n", u.Name, usergroup)

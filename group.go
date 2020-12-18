@@ -6,8 +6,8 @@ import (
 )
 
 type Group struct {
-	Name string `duck:"name"`
-	Gid  int    `duck:"gid"`
+	Name string
+	Gid  int
 
 	// If GidPrimary (yaml: gid_primary) is true, the gid is treated as the primary identifier.
 	// Behavior:
@@ -15,11 +15,13 @@ type Group struct {
 	//    GidPrimary false: groupmod -o (gid) is used if you change the gid of a group
 	GidPrimary bool `duck:"gid_primary"`
 
+	Delete bool
+
 	id int
 }
 
 func (g *Group) String() string {
-	return fmt.Sprintf("group %s/%d", g.Name, g.Gid)
+	return fmt.Sprintf("%s/%d", g.Name, g.Gid)
 }
 
 func (g *Group) setID(id int) {
@@ -43,6 +45,18 @@ func (g *Group) apply(r *run) (itemStatus, error) {
 		old = r.gidCache[g.Gid]
 	} else {
 		old = r.groupCache[g.Name]
+	}
+
+	if g.Delete {
+		if old == nil {
+			return itemUnchanged, nil
+		}
+		if err := printExec(r, "groupdel", old.Name); err != nil {
+			return 0, err
+		}
+		delete(r.groupCache, old.Name)
+		delete(r.gidCache, old.Gid)
+		return itemDeleted, nil
 	}
 
 	if old == nil {
