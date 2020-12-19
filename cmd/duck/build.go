@@ -40,7 +40,7 @@ func build() error {
 	}
 
 	// safe, clean, slow way
-	//	wd, err := ioutil.TempDir("", "duck")
+	//	wd, err := ioutil.TempDir("", "khan")
 	//	if err != nil {
 	//		return err
 	//	}
@@ -146,7 +146,7 @@ func main() {
 		os.Exit(1)
 	}
 }
-`, duckpkgalias, duckpkgname, duckpkgalias, wd, duckpkgalias, strings.TrimSpace(string(describe)), duckpkgalias, duckpkgalias)), 0644); err != nil {
+`, khanpkgalias, khanpkgname, khanpkgalias, wd, khanpkgalias, strings.TrimSpace(string(describe)), khanpkgalias, khanpkgalias)), 0644); err != nil {
 			return err
 		}
 	}
@@ -221,7 +221,7 @@ func stabletmpdir(srcpath string) (string, error) {
 	}
 
 	h := fmt.Sprintf("%x", md5.Sum([]byte(p)))
-	r := "/tmp/duck_" + h[:8]
+	r := "/tmp/khan_" + h[:8]
 
 	info, err := os.Stat(r)
 	if err == nil && info.IsDir() {

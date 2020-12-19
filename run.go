@@ -1,4 +1,4 @@
-package duck
+package khan
 
 import (
 	"bufio"
@@ -10,7 +10,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/yobert/duck/rio"
+	"github.com/desops/khan/rio"
 
 	"github.com/keegancsmith/shell"
 )

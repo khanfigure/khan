@@ -1,9 +1,8 @@
-package duck
+package khan
 
 import (
 	"io"
 	"path/filepath"
-	//"time"
 
 	"github.com/flosch/pongo2/v4"
 )
@@ -20,9 +19,6 @@ func (bdl *bindataloader) Get(path string) (io.Reader, error) {
 }
 
 func executeTemplate(r *run, tfile string) (string, error) {
-
-	//time.Sleep(time.Second)
-
 	ts := pongo2.NewSet("go-bindata", &bindataloader{r})
 
 	tpl, err := ts.FromFile(tfile)

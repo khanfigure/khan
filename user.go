@@ -1,4 +1,4 @@
-package duck
+package khan
 
 import (
 	"bytes"
@@ -29,7 +29,7 @@ type User struct {
 	// in /etc/shadow, it will be translated to a blank password. If you want an actually
 	// blank password (not safe) use BlankPassword: true (blank_password: true in yaml).
 	Password      string
-	BlankPassword bool `duck:"blank_password"`
+	BlankPassword bool `khan:"blank_password"`
 
 	// TODO fancy /etc/shadow fields
 
@@ -37,7 +37,7 @@ type User struct {
 	// Behavior:
 	//		UidPrimary true: usermod -l (name) is used if you change the name of the user
 	//    UidPrimary false: usermod -u (uid) is used if you change the uid of the user
-	UidPrimary bool `duck:"uid_primary"`
+	UidPrimary bool `khan:"uid_primary"`
 
 	Delete bool
 

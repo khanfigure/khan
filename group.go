@@ -1,4 +1,4 @@
-package duck
+package khan
 
 import (
 	"fmt"
@@ -13,7 +13,7 @@ type Group struct {
 	// Behavior:
 	//		GidPrimary true: groupmod --new-name (name) is used if you change the name of a group
 	//    GidPrimary false: groupmod -o (gid) is used if you change the gid of a group
-	GidPrimary bool `duck:"gid_primary"`
+	GidPrimary bool `khan:"gid_primary"`
 
 	Delete bool
 

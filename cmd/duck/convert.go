@@ -7,13 +7,14 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/yobert/duck"
+	"github.com/desops/khan"
+
 	"gopkg.in/yaml.v3"
 )
 
 const (
-	duckpkgname  = "github.com/yobert/duck"
-	duckpkgalias = "duck"
+	khanpkgname  = "github.com/desops/khan"
+	khanpkgalias = "khan"
 )
 
 type yamlwalker struct {
@@ -40,9 +41,9 @@ func (err yamlerror) Error() string {
 type yamlhandler func(w *yamlwalker, v *yaml.Node) error
 
 var yamlhandlers = map[string]yamlhandler{
-	"file":  yamlsimplehandler(&duck.File{}),
-	"group": yamlsimplehandler(&duck.Group{}),
-	"user":  yamlsimplehandler(&duck.User{}),
+	"file":  yamlsimplehandler(&khan.File{}),
+	"group": yamlsimplehandler(&khan.Group{}),
+	"user":  yamlsimplehandler(&khan.User{}),
 }
 
 func yamlkind(kind yaml.Kind) string {
@@ -140,7 +141,7 @@ func (w *yamlwalker) yamlwalkdoc(node *yaml.Node) error {
 
 			h, ok := yamlhandlers[k.Value]
 			if !ok {
-				return w.nodeErrorf(k, "Invalid duck-yaml type %#v", k.Value)
+				return w.nodeErrorf(k, "Invalid khan-yaml type %#v", k.Value)
 			}
 
 			if err := h(w, v); err != nil {
@@ -230,7 +231,7 @@ func (br *buildrun) yaml2struct(w *yamlwalker, v *yaml.Node, si interface{}) err
 	for i := 0; i < typ.NumField(); i++ {
 		field := val.Field(i)
 		ft := typ.Field(i)
-		if alias, ok := ft.Tag.Lookup("duck"); ok {
+		if alias, ok := ft.Tag.Lookup("khan"); ok {
 			if alias == "" {
 				// disabled
 			} else {
@@ -245,8 +246,8 @@ func (br *buildrun) yaml2struct(w *yamlwalker, v *yaml.Node, si interface{}) err
 
 	source := fmt.Sprintf("%s:%d", w.yamlpath, v.Line)
 
-	duckalias := w.addimport(duckpkgname, duckpkgalias)
-	*w.gobuf += fmt.Sprintf("\t%s.AddFromSource(%#v, &%s.%s{", duckalias, source, duckalias, typ.Name())
+	khanalias := w.addimport(khanpkgname, khanpkgalias)
+	*w.gobuf += fmt.Sprintf("\t%s.AddFromSource(%#v, &%s.%s{", khanalias, source, khanalias, typ.Name())
 	any := false
 	alreadyset := map[string]bool{}
 
@@ -295,7 +296,7 @@ func (br *buildrun) yaml2struct(w *yamlwalker, v *yaml.Node, si interface{}) err
 	*w.gobuf += "})\n"
 
 	// Validate struct
-	siv, ok := si.(duck.Validator)
+	siv, ok := si.(khan.Validator)
 	if ok {
 		if err := siv.Validate(); err != nil {
 			return w.nodeErrorf(v, "%w", err)
@@ -303,7 +304,7 @@ func (br *buildrun) yaml2struct(w *yamlwalker, v *yaml.Node, si interface{}) err
 	}
 
 	// Include static files into the go binary
-	sif, ok := si.(duck.StaticFiler)
+	sif, ok := si.(khan.StaticFiler)
 	if ok {
 		files := sif.StaticFiles()
 		for _, file := range files {
@@ -370,7 +371,7 @@ func yaml2value(w *yamlwalker, v *yaml.Node, dest reflect.Value) error {
 	return nil
 }
 
-func yamlsimplehandler(vv duck.Item) yamlhandler {
+func yamlsimplehandler(vv khan.Item) yamlhandler {
 	return func(w *yamlwalker, v *yaml.Node) error {
 		if err := w.br.yaml2struct(w, v, vv); err != nil {
 			return err

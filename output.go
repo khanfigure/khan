@@ -1,4 +1,4 @@
-package duck
+package khan
 
 import (
 	"fmt"
@@ -26,7 +26,7 @@ func (o *outputter) FinishItem(r *run, item Item, status itemStatus, err error) 
 		dc = color(Red)
 	}
 
-	typ := strings.ToLower(strings.TrimPrefix(fmt.Sprintf("%T", item), "*duck."))
+	typ := strings.ToLower(strings.TrimPrefix(fmt.Sprintf("%T", item), "*khan."))
 
 	s := status.String()
 	if err != nil {

@@ -1,4 +1,4 @@
-module github.com/yobert/duck
+module github.com/desops/khan
 
 go 1.15
 

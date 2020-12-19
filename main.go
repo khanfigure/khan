@@ -1,4 +1,4 @@
-package duck
+package khan
 
 import (
 	"flag"
@@ -7,8 +7,9 @@ import (
 	"os"
 	"strings"
 
+	"github.com/desops/khan/rio"
+
 	"github.com/desops/sshpool"
-	"github.com/yobert/duck/rio"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
 )
