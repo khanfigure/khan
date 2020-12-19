@@ -2,6 +2,7 @@ package rio
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -25,13 +26,13 @@ func (r *SSHReader) Close() error {
 	return r.reader.Close()
 }
 
-func (config *Config) ReadFile(host string, sudo bool, path string) ([]byte, error) {
+func (config *Config) ReadFile(path string) ([]byte, error) {
 	if config.Pool == nil {
 		return ioutil.ReadFile(path)
 	}
 
 	buf := &bytes.Buffer{}
-	fh, err := config.Open(host, sudo, path)
+	fh, err := config.Open(path)
 	if err != nil {
 		return nil, err
 	}
@@ -44,7 +45,7 @@ func (config *Config) ReadFile(host string, sudo bool, path string) ([]byte, err
 	return buf.Bytes(), nil
 }
 
-func (config *Config) Open(host string, sudo bool, path string) (io.ReadCloser, error) {
+func (config *Config) Open(path string) (io.ReadCloser, error) {
 	if config.Pool == nil {
 		return os.Open(path)
 	}
@@ -53,7 +54,7 @@ func (config *Config) Open(host string, sudo bool, path string) (io.ReadCloser, 
 		config: config,
 	}
 
-	session, err := config.Pool.Get(host)
+	session, err := config.Pool.Get(config.Host)
 	if err != nil {
 		return nil, err
 	}
@@ -67,8 +68,8 @@ func (config *Config) Open(host string, sudo bool, path string) (io.ReadCloser, 
 	reader.reader = r
 
 	cmd := "cat " + shell.ReadableEscapeArg(path)
-	if sudo {
-		cmd = "sudo " + cmd
+	if config.Sudo != "" {
+		cmd = "sudo -u " + shell.ReadableEscapeArg(config.Sudo) + " " + cmd
 	}
 
 	if err := session.Start(cmd); err != nil {
@@ -111,7 +112,7 @@ func (w *SSHWriter) Close() error {
 	return w.writer.Close()
 }
 
-func (config *Config) Create(host string, sudo bool, path string) (io.WriteCloser, error) {
+func (config *Config) Create(path string) (io.WriteCloser, error) {
 	if config.Pool == nil {
 		return os.Create(path)
 	}
@@ -120,7 +121,7 @@ func (config *Config) Create(host string, sudo bool, path string) (io.WriteClose
 		config: config,
 	}
 
-	session, err := config.Pool.Get(host)
+	session, err := config.Pool.Get(config.Host)
 	if err != nil {
 		return nil, err
 	}
@@ -132,8 +133,8 @@ func (config *Config) Create(host string, sudo bool, path string) (io.WriteClose
 	writer.writer = w
 
 	cmd := "cat > " + shell.ReadableEscapeArg(path)
-	if sudo {
-		cmd = "sudo " + cmd
+	if config.Sudo != "" {
+		cmd = "sudo -u " + shell.ReadableEscapeArg(config.Sudo) + " " + cmd
 	}
 
 	if err := session.Start(cmd); err != nil {
@@ -148,4 +149,51 @@ func (config *Config) Create(host string, sudo bool, path string) (io.WriteClose
 	}()
 
 	return writer, nil
+}
+
+func (config *Config) Remove(path string) error {
+	if config.Pool == nil {
+		return os.Remove(path)
+	}
+
+	session, err := config.Pool.Get(config.Host)
+	if err != nil {
+		return err
+	}
+
+	outbuf := &bytes.Buffer{}
+	errbuf := &bytes.Buffer{}
+
+	session.Stdout = outbuf
+	session.Stderr = errbuf
+
+	cmdline := "rm " + shell.ReadableEscapeArg(path)
+	if config.Sudo != "" {
+		cmdline = "sudo -u " + shell.ReadableEscapeArg(config.Sudo) + " " + cmdline
+	}
+
+	if config.Verbose {
+		fmt.Println("ssh", config.Host, cmdline)
+	}
+
+	if err := session.Run(cmdline); err != nil {
+		if config.Verbose {
+			fmt.Println("ssh", config.Host, cmdline, err)
+		}
+
+		e := strings.TrimSpace(errbuf.String())
+
+		if strings.HasPrefix(e, "rm: ") && strings.HasSuffix(e, "No such file or directory") {
+			// emulate os.Stat
+			return &os.PathError{
+				Op:   "rm",
+				Path: path,
+				Err:  syscall.ENOENT,
+			}
+		}
+
+		return err
+	}
+
+	return nil
 }

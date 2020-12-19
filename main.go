@@ -36,9 +36,13 @@ func Apply() error {
 	flag.BoolVar(&r.diff, "D", false, "Show full diff of file content changes")
 	flag.BoolVar(&r.verbose, "v", false, "Be more verbose")
 
-	flag.StringVar(&r.ssh, "ssh", "", "SSH mode connection string (host, user@host, or user@host:port)")
+	flag.StringVar(&r.host, "host", "", "Execute on host via SSH")
+	flag.StringVar(&r.user, "user", os.Getenv("USER"), "User to SSH as")
+	flag.StringVar(&r.sudo, "sudo", "", "Switch to user with sudo")
 
 	flag.Parse()
+
+	r.rioconfig.Verbose = r.verbose
 
 	title := "░░░ Configuration " + brightcolor(Yellow) + describe + reset() + " "
 
@@ -48,19 +52,19 @@ func Apply() error {
 		title += color(Red) + "execute"
 	}
 	title += reset()
-	if r.ssh == "" {
+	if r.host == "" {
 		hostname, err := os.Hostname()
 		if err != nil {
 			return err
 		}
 		title += " " + hostname
 	} else {
-		title += " " + r.ssh
+		title += " " + r.host
 	}
 	title += " ░░░"
 	fmt.Println(title)
 
-	if r.ssh != "" {
+	if r.host != "" {
 		socket := os.Getenv("SSH_AUTH_SOCK")
 		conn, err := net.Dial("unix", socket)
 		if err != nil {
@@ -68,7 +72,7 @@ func Apply() error {
 		}
 		agentClient := agent.NewClient(conn)
 		sshconfig := &ssh.ClientConfig{
-			User: os.Getenv("USER"),
+			User: r.user,
 			Auth: []ssh.AuthMethod{
 				ssh.PublicKeysCallback(agentClient.Signers),
 			},
@@ -76,8 +80,12 @@ func Apply() error {
 				// TODO
 				return nil
 			},
+			BannerCallback: ssh.BannerDisplayStderr(),
 		}
+
 		r.rioconfig.Pool = sshpool.New(sshconfig, &sshpool.PoolConfig{Debug: r.verbose})
+		r.rioconfig.Host = r.host
+		r.rioconfig.Sudo = r.sudo
 	}
 
 	out := &outputter{}

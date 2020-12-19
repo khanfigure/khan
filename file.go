@@ -59,16 +59,20 @@ func (f *File) apply(r *run) (itemStatus, error) {
 	var status itemStatus
 
 	if f.Delete {
-		_, err := r.rioconfig.Stat(r.ssh, true, f.Path)
+		_, err := r.rioconfig.Stat(f.Path)
 		if err != nil && iserrnotfound(err) {
 			return itemUnchanged, nil
 		}
+		if r.verbose && err != nil {
+			fmt.Fprintln(os.Stderr, "stat", f.Path, "error:", err)
+		}
+
 		status = itemDeleted
 
 		if r.dry {
 			return status, nil
 		}
-		return status, os.Remove(f.Path)
+		return status, r.rioconfig.Remove(f.Path)
 	}
 
 	content := f.Content
@@ -80,7 +84,7 @@ func (f *File) apply(r *run) (itemStatus, error) {
 		}
 	}
 
-	buf, err := r.rioconfig.ReadFile(r.ssh, true, f.Path)
+	buf, err := r.rioconfig.ReadFile(f.Path)
 	if err == nil && bytes.Compare(buf, []byte(content)) == 0 {
 		return itemUnchanged, nil
 	}
@@ -118,7 +122,7 @@ func (f *File) apply(r *run) (itemStatus, error) {
 		return status, nil
 	}
 
-	fh, err := r.rioconfig.Create(r.ssh, true, f.Path)
+	fh, err := r.rioconfig.Create(f.Path)
 	if err != nil {
 		return status, err
 	}

@@ -20,7 +20,10 @@ type run struct {
 	dry     bool
 	diff    bool
 	verbose bool
-	ssh     string
+
+	host string
+	user string
+	sudo string
 
 	rioconfig *rio.Config
 
@@ -156,7 +159,7 @@ func (r *run) reloadUserGroupCache() error {
 }
 
 func readColonFile(r *run, path string) ([][]string, error) {
-	fh, err := r.rioconfig.Open(r.ssh, true, path)
+	fh, err := r.rioconfig.Open(path)
 	if err != nil {
 		return nil, err
 	}
@@ -198,7 +201,7 @@ func printExecStdin(r *run, stdin io.Reader, c string, args ...string) error {
 	if r.dry {
 		return nil
 	}
-	cmd := r.rioconfig.Command(context.Background(), r.ssh, c, args...)
+	cmd := r.rioconfig.Command(context.Background(), c, args...)
 	cmd.Stdin = stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

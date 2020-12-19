@@ -60,6 +60,8 @@ func build() error {
 
 	fmt.Println("Building", wd, "→", outfile)
 
+	copybacklist := []string{"go.sum", "go.mod"}
+
 	if err := sync(wd, cwd); err != nil {
 		return err
 	}
@@ -108,8 +110,14 @@ func build() error {
 		return err
 	}
 
-	if _, err := os.Stat(wd + "/main.go"); err != nil {
+	if _, err := os.Stat(wd + "/go.mod"); err != nil {
+		if err := ioutil.WriteFile(wd+"/go.mod", []byte(`module myconfig
+`), 0644); err != nil {
+			return err
+		}
+	}
 
+	if _, err := os.Stat(wd + "/main.go"); err != nil {
 		if err := ioutil.WriteFile(wd+"/main.go", []byte(fmt.Sprintf(`package main
 import (
 	"fmt"
@@ -153,8 +161,9 @@ func main() {
 		return err
 	}
 
-	// Copy back out files that go often changes
-	for _, p := range []string{"go.sum", "go.mod"} {
+	// Copy back out files that go often changes, but only if you had them in your original
+	// working directory. If you didn't have the file originally, you probably don't care.
+	for _, p := range copybacklist {
 		if _, err := os.Stat(cwd + "/" + p); err == nil {
 			err = compare(cwd+"/"+p, wd+"/"+p)
 			if err == nil {
@@ -164,8 +173,9 @@ func main() {
 				if err := cp(cwd+"/"+p, wd+"/"+p); err != nil {
 					return err
 				}
+			} else {
+				return err
 			}
-			return err
 		}
 	}
 

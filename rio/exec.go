@@ -2,6 +2,7 @@ package rio
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os/exec"
 
@@ -24,12 +25,11 @@ type Cmd struct {
 	config *Config
 }
 
-func (config *Config) Command(ctx context.Context, host, path string, args ...string) *Cmd {
+func (config *Config) Command(ctx context.Context, path string, args ...string) *Cmd {
 	return &Cmd{
 		Path: path,
 		Args: args,
 
-		Host:    host,
 		Context: ctx,
 
 		config: config,
@@ -48,7 +48,7 @@ func (cmd *Cmd) Run() error {
 		return c.Run()
 	}
 
-	session, err := cmd.config.Pool.Get(cmd.Host)
+	session, err := cmd.config.Pool.Get(cmd.config.Host)
 	if err != nil {
 		return err
 	}
@@ -64,6 +64,14 @@ func (cmd *Cmd) Run() error {
 	cmdline := cmd.Path
 	for _, a := range cmd.Args {
 		cmdline += " " + shell.ReadableEscapeArg(a)
+	}
+
+	if cmd.config.Sudo != "" {
+		cmdline = "sudo -u " + shell.ReadableEscapeArg(cmd.config.Sudo) + " " + cmdline
+	}
+
+	if cmd.config.Verbose {
+		fmt.Println("ssh", cmd.config.Host, cmdline)
 	}
 
 	return session.Run(cmdline)
