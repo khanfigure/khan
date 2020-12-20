@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 
 	"github.com/keegancsmith/shell"
@@ -42,8 +43,12 @@ func (cmd *Cmd) Run() error {
 		c.Stdin = cmd.Stdin
 		c.Stdout = cmd.Stdout
 		c.Stderr = cmd.Stderr
-		for _, e := range cmd.Env {
-			c.Env = append(c.Env, e[0]+"="+e[1])
+		if len(cmd.Env) > 0 {
+			// For now, don't copy everything, just PATH
+			c.Env = append(c.Env, "PATH="+os.Getenv("PATH"))
+			for _, e := range cmd.Env {
+				c.Env = append(c.Env, e[0]+"="+e[1])
+			}
 		}
 		return c.Run()
 	}
@@ -58,7 +63,9 @@ func (cmd *Cmd) Run() error {
 	session.Stdout = cmd.Stdout
 	session.Stderr = cmd.Stderr
 	for _, e := range cmd.Env {
-		session.Setenv(e[0], e[1])
+		if err := session.Setenv(e[0], e[1]); err != nil {
+			return err
+		}
 	}
 
 	cmdline := cmd.Path
@@ -67,7 +74,7 @@ func (cmd *Cmd) Run() error {
 	}
 
 	if cmd.config.Verbose {
-		fmt.Println("ssh", cmd.config.Host, cmdline)
+		fmt.Println("ssh", cmd.config.Host, cmdline, cmd.Env)
 	}
 
 	err = session.Run(cmdline)

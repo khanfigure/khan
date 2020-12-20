@@ -15,6 +15,8 @@ type File struct {
 	Path string
 	User User
 
+	Mode os.FileMode
+
 	Content  string
 	Template string
 

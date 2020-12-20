@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -317,6 +318,21 @@ func (br *buildrun) yaml2struct(w *yamlwalker, v *yaml.Node, si interface{}) err
 
 func yaml2value(w *yamlwalker, v *yaml.Node, dest reflect.Value) error {
 	typ := dest.Type()
+
+	// Special handling for this type: Parse as octal
+	if typ == reflect.TypeOf(os.FileMode(0)) {
+		if v.Kind != yaml.ScalarNode {
+			return w.nodeErrorf(v, "Expected scaler convertable to %s: Got %s", typ.Kind(), yamlkind(v.Kind))
+		}
+		vi, err := strconv.ParseUint(v.Value, 8, 32)
+		if err != nil {
+			return w.nodeErrorf(v, "Conversion from octal to uint32 failed: %w", err)
+		}
+		dest.SetUint(vi)
+		return nil
+	}
+
+	// General type handling
 	switch typ.Kind() {
 	case reflect.String:
 		if v.Kind != yaml.ScalarNode {
