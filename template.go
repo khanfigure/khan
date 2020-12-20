@@ -41,11 +41,9 @@ func executeTemplate(r *run, tfile string) (string, error) {
 			"secret": func(path string) (map[string]string, error) {
 				buf := &bytes.Buffer{}
 				cmd := r.rioconfig.Command(context.Background(), "vault", "kv", "get", "-format", "json", "secret/"+path)
+				cmd.Shell = true
 				cmd.Stdout = buf
 				cmd.Stderr = os.Stderr
-				cmd.Env = [][2]string{
-					{"VAULT_ADDR", "http://localhost:8200"},
-				}
 				if err := cmd.Run(); err != nil {
 					return nil, err
 				}
