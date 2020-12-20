@@ -91,12 +91,18 @@ func (f *File) apply(r *run) (itemStatus, error) {
 	if err != nil && iserrnotfound(err) {
 		status = itemCreated
 	} else {
-		status = itemModified
-		if err != nil {
-			if r.verbose {
-				fmt.Printf("Error reading %#v: %v\n", f.Path, err)
-			}
-		}
+		// This seemed risky.
+		// If the file could not be read, don't assume
+		// we should continue with writing to it.
+		//		status = itemModified
+		//		if err != nil {
+		//			if r.verbose {
+		//				fmt.Printf("Error reading %#v: %v\n", f.Path, err)
+		//			}
+		//		}
+
+		// Instead let's return the read error.
+		return 0, err
 	}
 
 	if r.diff {
