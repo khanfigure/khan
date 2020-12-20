@@ -81,16 +81,6 @@ func (config *Config) Open(path string) (io.ReadCloser, error) {
 		return os.Open(path)
 	}
 
-	ri, err := config.getremoteinfo(config.Host)
-	if err != nil {
-		return nil, err
-	}
-
-	sudocmd := "sudo -u"
-	if ri.os == "OpenBSD" {
-		sudocmd = "doas -u"
-	}
-
 	reader := &SSHReader{
 		config:  config,
 		procerr: make(chan error),
@@ -110,9 +100,6 @@ func (config *Config) Open(path string) (io.ReadCloser, error) {
 	reader.reader = r
 
 	cmdline := "cat " + shell.ReadableEscapeArg(path)
-	if config.Sudo != "" {
-		cmdline = sudocmd + " " + shell.ReadableEscapeArg(config.Sudo) + " " + cmdline
-	}
 
 	if config.Verbose {
 		fmt.Println("ssh", config.Host, cmdline)
@@ -198,16 +185,6 @@ func (config *Config) Create(path string) (io.WriteCloser, error) {
 		return os.Create(path)
 	}
 
-	ri, err := config.getremoteinfo(config.Host)
-	if err != nil {
-		return nil, err
-	}
-
-	sudocmd := "sudo -u"
-	if ri.os == "OpenBSD" {
-		sudocmd = "doas -u"
-	}
-
 	writer := &SSHWriter{
 		config:  config,
 		procerr: make(chan error),
@@ -227,9 +204,6 @@ func (config *Config) Create(path string) (io.WriteCloser, error) {
 	writer.writer = w
 
 	cmdline := "cat > " + shell.ReadableEscapeArg(path)
-	if config.Sudo != "" {
-		cmdline = sudocmd + " " + shell.ReadableEscapeArg(config.Sudo) + " " + cmdline
-	}
 
 	if config.Verbose {
 		fmt.Println("ssh", config.Host, cmdline)
@@ -274,16 +248,6 @@ func (config *Config) Remove(path string) error {
 		return os.Remove(path)
 	}
 
-	ri, err := config.getremoteinfo(config.Host)
-	if err != nil {
-		return err
-	}
-
-	sudocmd := "sudo -u"
-	if ri.os == "OpenBSD" {
-		sudocmd = "doas -u"
-	}
-
 	session, err := config.Pool.Get(config.Host)
 	if err != nil {
 		return err
@@ -295,10 +259,7 @@ func (config *Config) Remove(path string) error {
 	session.Stdout = outbuf
 	session.Stderr = errbuf
 
-	cmdline := "rm " + shell.ReadableEscapeArg(path)
-	if config.Sudo != "" {
-		cmdline = sudocmd + " " + shell.ReadableEscapeArg(config.Sudo) + " " + cmdline
-	}
+	cmdline := "rm -f " + shell.ReadableEscapeArg(path)
 
 	if config.Verbose {
 		fmt.Println("ssh", config.Host, cmdline)

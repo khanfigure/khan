@@ -39,7 +39,6 @@ func Apply() error {
 
 	flag.StringVar(&r.host, "host", "", "Execute on host via SSH")
 	flag.StringVar(&r.user, "user", os.Getenv("USER"), "User to SSH as")
-	flag.StringVar(&r.sudo, "sudo", "", "Switch to user with sudo")
 
 	flag.Parse()
 
@@ -86,7 +85,6 @@ func Apply() error {
 
 		r.rioconfig.Pool = sshpool.New(sshconfig, &sshpool.PoolConfig{Debug: r.verbose})
 		r.rioconfig.Host = r.host
-		r.rioconfig.Sudo = r.sudo
 	}
 
 	out := &outputter{}
@@ -113,7 +111,9 @@ func Apply() error {
 			return err
 		}
 
-		finished++
+		if !r.dry || status == itemUnchanged {
+			finished++
+		}
 	}
 
 	return nil

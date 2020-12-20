@@ -66,13 +66,15 @@ func (cmd *Cmd) Run() error {
 		cmdline += " " + shell.ReadableEscapeArg(a)
 	}
 
-	if cmd.config.Sudo != "" {
-		cmdline = "sudo -u " + shell.ReadableEscapeArg(cmd.config.Sudo) + " " + cmdline
-	}
-
 	if cmd.config.Verbose {
 		fmt.Println("ssh", cmd.config.Host, cmdline)
 	}
 
-	return session.Run(cmdline)
+	err = session.Run(cmdline)
+
+	if cmd.config.Verbose {
+		fmt.Println("ssh", cmd.config.Host, cmdline, err)
+	}
+
+	return err
 }

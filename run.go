@@ -23,7 +23,6 @@ type run struct {
 
 	host string
 	user string
-	sudo string
 
 	rioconfig *rio.Config
 

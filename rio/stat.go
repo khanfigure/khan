@@ -119,9 +119,6 @@ func (config *Config) Stat(path string) (os.FileInfo, error) {
 	session.Stderr = errbuf
 
 	cmdline := statcmd + " " + shell.ReadableEscapeArg(path)
-	if config.Sudo != "" {
-		cmdline = "sudo -u " + shell.ReadableEscapeArg(config.Sudo) + " " + cmdline
-	}
 
 	if config.Verbose {
 		fmt.Println("ssh", config.Host, cmdline)

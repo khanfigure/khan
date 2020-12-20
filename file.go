@@ -56,7 +56,7 @@ func (f *File) StaticFiles() []string {
 }
 
 func (f *File) apply(r *run) (itemStatus, error) {
-	var status itemStatus
+	status := itemModified
 
 	if f.Delete {
 		_, err := r.rioconfig.Stat(f.Path)
@@ -80,7 +80,7 @@ func (f *File) apply(r *run) (itemStatus, error) {
 		var err error
 		content, err = executeTemplate(r, f.Template)
 		if err != nil {
-			return status, err
+			return 0, err
 		}
 	}
 
@@ -88,21 +88,23 @@ func (f *File) apply(r *run) (itemStatus, error) {
 	if err == nil && bytes.Compare(buf, []byte(content)) == 0 {
 		return itemUnchanged, nil
 	}
-	if err != nil && iserrnotfound(err) {
-		status = itemCreated
-	} else {
-		// This seemed risky.
-		// If the file could not be read, don't assume
-		// we should continue with writing to it.
-		//		status = itemModified
-		//		if err != nil {
-		//			if r.verbose {
-		//				fmt.Printf("Error reading %#v: %v\n", f.Path, err)
-		//			}
-		//		}
+	if err != nil {
+		if iserrnotfound(err) {
+			status = itemCreated
+		} else {
+			// This seemed risky.
+			// If the file could not be read, don't assume
+			// we should continue with writing to it.
+			//		status = itemModified
+			//		if err != nil {
+			//			if r.verbose {
+			//				fmt.Printf("Error reading %#v: %v\n", f.Path, err)
+			//			}
+			//		}
 
-		// Instead let's return the read error.
-		return 0, err
+			// Instead let's return the read error.
+			return 0, err
+		}
 	}
 
 	if r.diff {
@@ -119,7 +121,7 @@ func (f *File) apply(r *run) (itemStatus, error) {
 		}
 		difftxt, err := difflib.GetUnifiedDiffString(diff)
 		if err != nil {
-			return status, err
+			return 0, err
 		}
 		fmt.Print(difftxt)
 	}
@@ -130,14 +132,14 @@ func (f *File) apply(r *run) (itemStatus, error) {
 
 	fh, err := r.rioconfig.Create(f.Path)
 	if err != nil {
-		return status, err
+		return 0, err
 	}
 	defer fh.Close()
 	if _, err := fh.Write([]byte(content)); err != nil {
-		return status, err
+		return 0, err
 	}
 	if err := fh.Close(); err != nil {
-		return status, err
+		return 0, err
 	}
 	return status, nil
 }
