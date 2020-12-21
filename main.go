@@ -44,14 +44,15 @@ func Apply() error {
 
 	r.rioconfig.Verbose = r.verbose
 
-	title := "░░░ Configuration " + brightcolor(Yellow) + describe + reset() + " "
+	title := "███ "
 
 	if r.dry {
-		title += color(Green) + "dry run"
+		title += "Dry running"
 	} else {
-		title += color(Red) + "execute"
+		title += "Applying"
 	}
-	title += reset()
+	title += " " + brightcolor(Yellow) + describe + reset() + " on "
+
 	if r.host == "" {
 		hostname, err := os.Hostname()
 		if err != nil {
@@ -61,7 +62,7 @@ func Apply() error {
 	} else {
 		title += " " + r.host
 	}
-	title += " ░░░"
+	title += "..."
 	fmt.Println(title)
 
 	if r.host != "" {

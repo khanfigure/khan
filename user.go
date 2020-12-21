@@ -94,7 +94,7 @@ func (u *User) apply(r *run) (itemStatus, error) {
 		//fmt.Printf("+ user %s (group %s)\n", u.Name, usergroup)
 		created = true
 
-		args := []string{"-g", usergroup, "-u", strconv.Itoa(u.Uid), u.Name}
+		args := []string{"-m", "-g", usergroup, "-u", strconv.Itoa(u.Uid), u.Name}
 		if u.Gecos != "" {
 			args = append(args, "-c", u.Gecos)
 		}
@@ -153,9 +153,19 @@ func (u *User) apply(r *run) (itemStatus, error) {
 	if oldpw != newpw {
 		modified = true
 		//fmt.Printf("~ user %s (password)\n", u.Name)
-		input := bytes.NewBuffer([]byte(u.Name + ":" + newpw + "\n"))
-		if err := printExecStdin(r, input, "chpasswd", "-e"); err != nil {
-			return 0, err
+		if r.bsdmode {
+			// wish openbsd had chpasswd :'(
+			// this leaks the crypted password hash via process args.
+			// TODO maybe just buckle down and learn the proper way to lock the master file
+			// and modify it directly?
+			if err := printExec(r, "usermod", "-p", newpw, u.Name); err != nil {
+				return 0, err
+			}
+		} else {
+			input := bytes.NewBuffer([]byte(u.Name + ":" + newpw + "\n"))
+			if err := printExecStdin(r, input, "chpasswd", "-e"); err != nil {
+				return 0, err
+			}
 		}
 		newuser := *old
 		newuser.Password = u.Password

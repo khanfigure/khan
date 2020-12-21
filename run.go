@@ -31,6 +31,7 @@ type run struct {
 	uidCache    map[int]*User
 	groupCache  map[string]*Group
 	gidCache    map[int]*Group
+	bsdmode     bool
 
 	assetfn func(string) (io.Reader, error)
 
@@ -45,6 +46,11 @@ type run struct {
 
 // Always lock userCacheMu before calling this
 func (r *run) reloadUserGroupCache() error {
+	// already cached!
+	if r.groupCache != nil {
+		return nil
+	}
+
 	r.groupCache = map[string]*Group{}
 	r.gidCache = map[int]*Group{}
 	r.userCache = map[string]*User{}
@@ -89,6 +95,11 @@ func (r *run) reloadUserGroupCache() error {
 	}
 
 	sh_rows, err := readColonFile(r, "/etc/shadow")
+	if err != nil && iserrnotfound(err) {
+		// try openbsd mode!
+		r.bsdmode = true
+		sh_rows, err = readColonFile(r, "/etc/master.passwd")
+	}
 	if err != nil {
 		return err
 	}
