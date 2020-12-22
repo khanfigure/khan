@@ -33,7 +33,7 @@ type run struct {
 	gidCache    map[int]*Group
 	bsdmode     bool
 
-	assetfn func(string) (io.Reader, error)
+	assetfn func(string) (io.ReadCloser, error)
 
 	out *outputter
 }

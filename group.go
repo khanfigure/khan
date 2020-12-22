@@ -9,12 +9,6 @@ type Group struct {
 	Name string
 	Gid  int
 
-	// If GidPrimary (yaml: gid_primary) is true, the gid is treated as the primary identifier.
-	// Behavior:
-	//		GidPrimary true: groupmod --new-name (name) is used if you change the name of a group
-	//    GidPrimary false: groupmod -o (gid) is used if you change the gid of a group
-	GidPrimary bool `khan:"gid_primary"`
-
 	Delete bool
 
 	id int
@@ -39,13 +33,7 @@ func (g *Group) apply(r *run) (itemStatus, error) {
 		return 0, err
 	}
 
-	var old *Group
-
-	if g.GidPrimary {
-		old = r.gidCache[g.Gid]
-	} else {
-		old = r.groupCache[g.Name]
-	}
+	old := r.groupCache[g.Name]
 
 	if g.Delete {
 		if old == nil {

@@ -27,6 +27,9 @@ type yamlwalker struct {
 	imports  map[string]string
 	yamlpath string
 	wd       string
+
+	shortkey   string
+	shortvalue string
 }
 
 type yamlerror struct {
@@ -140,9 +143,27 @@ func (w *yamlwalker) yamlwalkdoc(node *yaml.Node) error {
 				return w.nodeErrorf(k, "Expected scalar map key: Got %s", yamlkind(k.Kind))
 			}
 
-			h, ok := yamlhandlers[k.Value]
+			// TODO maybe pass these to handlerfunc to have better scoping
+			w.shortkey = ""
+			w.shortvalue = ""
+
+			handler := k.Value
+
+			spc := strings.IndexByte(handler, ' ')
+			if spc != -1 {
+				w.shortkey = handler[spc:]
+				handler = handler[:spc-1]
+			}
+
+			// special super-shortcut for files
+			if w.shortkey == "" && strings.HasPrefix(handler, "/") {
+				w.shortkey = handler
+				handler = "file"
+			}
+
+			h, ok := yamlhandlers[handler]
 			if !ok {
-				return w.nodeErrorf(k, "Invalid khan-yaml type %#v", k.Value)
+				return w.nodeErrorf(k, "Invalid khan-yaml type %#v", handler)
 			}
 
 			if err := h(w, v); err != nil {
@@ -203,14 +224,6 @@ func (br *buildrun) yaml2go(wd, yamlpath, gopath string, assetfs *bool) error {
 }
 
 func (br *buildrun) yaml2struct(w *yamlwalker, v *yaml.Node, si interface{}) error {
-	if v.Kind != yaml.MappingNode {
-		return w.nodeErrorf(v, "Expected map: Got %s", yamlkind(v.Kind))
-	}
-
-	if len(v.Content)%2 != 0 {
-		return w.nodeErrorf(v, "Odd sized YAML map")
-	}
-
 	val := reflect.ValueOf(si)
 	typ := val.Type()
 
@@ -229,20 +242,49 @@ func (br *buildrun) yaml2struct(w *yamlwalker, v *yaml.Node, si interface{}) err
 
 	fields := map[string]reflect.Value{}
 	fieldtypes := map[string]reflect.StructField{}
+
+	var (
+		shortkeyk   string
+		shortkeyf   reflect.Value
+		shortkeyt   reflect.StructField
+		shortvaluek string
+		shortvaluef reflect.Value
+		shortvaluet reflect.StructField
+	)
+
 	for i := 0; i < typ.NumField(); i++ {
 		field := val.Field(i)
 		ft := typ.Field(i)
-		if alias, ok := ft.Tag.Lookup("khan"); ok {
-			if alias == "" {
-				// disabled
-			} else {
-				fields[alias] = field
-				fieldtypes[alias] = ft
+
+		key := strings.ToLower(ft.Name)
+
+		if tv, ok := ft.Tag.Lookup("khan"); ok {
+			t, to := parseTag(tv)
+
+			if t != "" {
+				key = t
 			}
-		} else {
-			fields[strings.ToLower(ft.Name)] = field
-			fieldtypes[strings.ToLower(ft.Name)] = ft
+
+			if to.Contains("shortkey") {
+				shortkeyk = key
+				shortkeyf = field
+				shortkeyt = ft
+			}
+
+			if to.Contains("shortvalue") {
+				shortvaluek = key
+				shortvaluef = field
+				shortvaluet = ft
+			}
+
+			if t == "-" {
+				// Don't parse this struct field from the yaml
+				continue
+			}
 		}
+
+		fields[key] = field
+		fieldtypes[key] = ft
 	}
 
 	source := fmt.Sprintf("%s:%d", w.yamlpath, v.Line)
@@ -252,28 +294,14 @@ func (br *buildrun) yaml2struct(w *yamlwalker, v *yaml.Node, si interface{}) err
 	any := false
 	alreadyset := map[string]bool{}
 
-	for i := 0; i < len(v.Content); i += 2 {
-		k := v.Content[i]
-		v := v.Content[i+1]
-
-		if k.Kind != yaml.ScalarNode {
-			return w.nodeErrorf(k, "%s expected scalar map key: Got %s", Title, yamlkind(k.Kind))
+	if shortkeyk != "" && w.shortkey != "" {
+		if alreadyset[shortkeyk] {
+			return w.nodeErrorf(v, "%s %s set multiple times", Title, shortkeyk)
 		}
+		alreadyset[shortkeyk] = true
 
-		param := k.Value
-
-		f, ok := fields[k.Value]
-		if !ok {
-			return w.nodeErrorf(k, "Unknown %s parameter %#v", title, param)
-		}
-		ft := fieldtypes[k.Value]
-
-		if alreadyset[k.Value] {
-			return w.nodeErrorf(k, "%s %s set multiple times", Title, param)
-		}
-		alreadyset[k.Value] = true
-
-		// TODO support arrays and structs
+		f := shortkeyf
+		ft := shortkeyt
 
 		if !any {
 			*w.gobuf += "\n"
@@ -281,14 +309,90 @@ func (br *buildrun) yaml2struct(w *yamlwalker, v *yaml.Node, si interface{}) err
 		}
 
 		if !f.CanSet() {
-			return w.nodeErrorf(v, "%s %s cannot be set", Title, k.Value)
+			return w.nodeErrorf(v, "%s %s cannot be set", Title, shortkeyk)
 		}
 
-		if err := yaml2value(w, v, f); err != nil {
+		if err := yaml2value(w, v, yaml.ScalarNode, w.shortkey, f); err != nil {
 			return err
 		}
 
 		*w.gobuf += fmt.Sprintf("\t\t%s: %#v,\n", ft.Name, f.Interface())
+	}
+
+	if v.Kind == yaml.ScalarNode && shortvaluek != "" {
+		if alreadyset[shortvaluek] {
+			return w.nodeErrorf(v, "%s %s set multiple times", Title, shortvaluek)
+		}
+		alreadyset[shortvaluek] = true
+
+		f := shortvaluef
+		ft := shortvaluet
+
+		if !any {
+			*w.gobuf += "\n"
+			any = true
+		}
+
+		if !f.CanSet() {
+			return w.nodeErrorf(v, "%s %s cannot be set", Title, shortvaluek)
+		}
+
+		if err := yaml2value(w, v, yaml.ScalarNode, v.Value, f); err != nil {
+			return err
+		}
+
+		*w.gobuf += fmt.Sprintf("\t\t%s: %#v,\n", ft.Name, f.Interface())
+	} else if v.Kind == yaml.MappingNode {
+
+		if len(v.Content)%2 != 0 {
+			return w.nodeErrorf(v, "Odd sized YAML map")
+		}
+
+		for i := 0; i < len(v.Content); i += 2 {
+			k := v.Content[i]
+			v := v.Content[i+1]
+
+			if k.Kind != yaml.ScalarNode {
+				return w.nodeErrorf(k, "%s expected scalar map key: Got %s", Title, yamlkind(k.Kind))
+			}
+
+			param := k.Value
+
+			f, ok := fields[k.Value]
+			if !ok {
+				return w.nodeErrorf(k, "Unknown %s parameter %#v", title, param)
+			}
+			ft := fieldtypes[k.Value]
+
+			if alreadyset[k.Value] {
+				return w.nodeErrorf(k, "%s %s set multiple times", Title, param)
+			}
+			alreadyset[k.Value] = true
+
+			// TODO support arrays and structs
+
+			if !any {
+				*w.gobuf += "\n"
+				any = true
+			}
+
+			if !f.CanSet() {
+				return w.nodeErrorf(v, "%s %s cannot be set", Title, k.Value)
+			}
+
+			if err := yaml2value(w, v, v.Kind, v.Value, f); err != nil {
+				return err
+			}
+
+			*w.gobuf += fmt.Sprintf("\t\t%s: %#v,\n", ft.Name, f.Interface())
+		}
+
+	} else {
+		if shortvaluek == "" {
+			return w.nodeErrorf(v, "Expected map: Got %s", yamlkind(v.Kind))
+		} else {
+			return w.nodeErrorf(v, "Expected map or a scalar %s: Got %s", yamlkind(v.Kind), shortvaluek)
+		}
 	}
 
 	if any {
@@ -316,15 +420,15 @@ func (br *buildrun) yaml2struct(w *yamlwalker, v *yaml.Node, si interface{}) err
 	return nil
 }
 
-func yaml2value(w *yamlwalker, v *yaml.Node, dest reflect.Value) error {
+func yaml2value(w *yamlwalker, v *yaml.Node, kind yaml.Kind, value string, dest reflect.Value) error {
 	typ := dest.Type()
 
 	// Special handling for this type: Parse as octal
 	if typ == reflect.TypeOf(os.FileMode(0)) {
-		if v.Kind != yaml.ScalarNode {
-			return w.nodeErrorf(v, "Expected scaler convertable to %s: Got %s", typ.Kind(), yamlkind(v.Kind))
+		if kind != yaml.ScalarNode {
+			return w.nodeErrorf(v, "Expected scaler convertable to %s: Got %s", typ.Kind(), yamlkind(kind))
 		}
-		vi, err := strconv.ParseUint(v.Value, 8, 32)
+		vi, err := strconv.ParseUint(value, 8, 32)
 		if err != nil {
 			return w.nodeErrorf(v, "Conversion from octal to uint32 failed: %w", err)
 		}
@@ -335,24 +439,24 @@ func yaml2value(w *yamlwalker, v *yaml.Node, dest reflect.Value) error {
 	// General type handling
 	switch typ.Kind() {
 	case reflect.String:
-		if v.Kind != yaml.ScalarNode {
-			return w.nodeErrorf(v, "Expected scaler convertable to %s: Got %s", typ.Kind(), yamlkind(v.Kind))
+		if kind != yaml.ScalarNode {
+			return w.nodeErrorf(v, "Expected scaler convertable to %s: Got %s", typ.Kind(), yamlkind(kind))
 		}
-		dest.SetString(v.Value)
+		dest.SetString(value)
 	case reflect.Int:
-		if v.Kind != yaml.ScalarNode {
-			return w.nodeErrorf(v, "Expected scaler convertable to %s: Got %s", typ.Kind(), yamlkind(v.Kind))
+		if kind != yaml.ScalarNode {
+			return w.nodeErrorf(v, "Expected scaler convertable to %s: Got %s", typ.Kind(), yamlkind(kind))
 		}
-		vi, err := strconv.Atoi(v.Value)
+		vi, err := strconv.Atoi(value)
 		if err != nil {
 			return w.nodeErrorf(v, "Conversion to integer failed: %w", err)
 		}
 		dest.SetInt(int64(vi))
 	case reflect.Bool:
-		if v.Kind != yaml.ScalarNode {
-			return w.nodeErrorf(v, "Expected scaler convertable to %s: Got %s", typ.Kind(), yamlkind(v.Kind))
+		if kind != yaml.ScalarNode {
+			return w.nodeErrorf(v, "Expected scaler convertable to %s: Got %s", typ.Kind(), yamlkind(kind))
 		}
-		vb, err := strconv.ParseBool(v.Value)
+		vb, err := strconv.ParseBool(value)
 		if err != nil {
 			return w.nodeErrorf(v, "Conversion to boolean failed: %w", err)
 		}
@@ -360,20 +464,20 @@ func yaml2value(w *yamlwalker, v *yaml.Node, dest reflect.Value) error {
 	case reflect.Slice:
 		sv := reflect.MakeSlice(typ, len(v.Content), len(v.Content))
 
-		if v.Kind != yaml.SequenceNode {
+		if kind != yaml.SequenceNode {
 			// Special case: Empty scalar is allowed as empty list.
-			if v.Kind == yaml.ScalarNode && v.Value == "" {
+			if kind == yaml.ScalarNode && value == "" {
 				dest.Set(sv)
 				return nil
 			}
 
-			return w.nodeErrorf(v, "Expected array: Got %s", yamlkind(v.Kind))
+			return w.nodeErrorf(v, "Expected array: Got %s", yamlkind(kind))
 		}
 
 		for i := 0; i < len(v.Content); i++ {
 			vv := v.Content[i]
 			rv := reflect.New(typ.Elem())
-			if err := yaml2value(w, vv, rv.Elem()); err != nil {
+			if err := yaml2value(w, vv, vv.Kind, vv.Value, rv.Elem()); err != nil {
 				return err
 			}
 			sv.Index(i).Set(rv.Elem())

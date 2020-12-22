@@ -33,12 +33,6 @@ type User struct {
 
 	// TODO fancy /etc/shadow fields
 
-	// If UidPrimary (yaml: uid_primary) is true, the uid is treated as the primary identifier.
-	// Behavior:
-	//		UidPrimary true: usermod -l (name) is used if you change the name of the user
-	//    UidPrimary false: usermod -u (uid) is used if you change the uid of the user
-	UidPrimary bool `khan:"uid_primary"`
-
 	Delete bool
 
 	id int
@@ -67,13 +61,7 @@ func (u *User) apply(r *run) (itemStatus, error) {
 		usergroup = u.Name
 	}
 
-	var old *User
-
-	if u.UidPrimary {
-		old = r.uidCache[u.Uid]
-	} else {
-		old = r.userCache[u.Name]
-	}
+	old := r.userCache[u.Name]
 
 	if u.Delete {
 		if old == nil {

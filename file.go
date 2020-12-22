@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"syscall"
 
@@ -12,13 +13,22 @@ import (
 )
 
 type File struct {
-	Path string
+	Path string `khan:"path,shortkey"`
 	User User
 
 	Mode os.FileMode
 
-	Content  string
-	Template string
+	// Content specifies a static string for the content of the file.
+	Content string
+
+	// Src is a path on the configurer for the source of the file.
+	// This will be bundled into your khan build output.
+	Src string `khan:"src,shortvalue"`
+
+	// Local is a path on the configuree for the source of the file
+	Local string
+
+	Template string // TODO remove
 
 	Delete bool
 
@@ -54,6 +64,9 @@ func (f *File) StaticFiles() []string {
 	if f.Template != "" {
 		return []string{f.Template}
 	}
+	if f.Src != "" {
+		return []string{f.Src}
+	}
 	return nil
 }
 
@@ -78,6 +91,18 @@ func (f *File) apply(r *run) (itemStatus, error) {
 	}
 
 	content := f.Content
+	if f.Src != "" {
+		fh, err := r.assetfn(f.Src)
+		if err != nil {
+			return 0, err
+		}
+		defer fh.Close()
+		buf := &bytes.Buffer{}
+		if _, err := io.Copy(buf, fh); err != nil {
+			return 0, err
+		}
+		content = buf.String()
+	}
 	if f.Template != "" {
 		var err error
 		content, err = executeTemplate(r, f.Template)

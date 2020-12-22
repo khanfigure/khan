@@ -128,12 +128,18 @@ import (
 	%s %#v
 )
 
-func assetfn(path string) (io.Reader, error) {
+type fakecloser struct {
+	io.Reader
+}
+func (fc fakecloser) Close() error {
+	return nil
+}
+func assetfn(path string) (io.ReadCloser, error) {
 	buf, err := Asset(path)
 	if err != nil {
 		return nil, err
 	}
-	return bytes.NewReader(buf), nil
+	return fakecloser{bytes.NewReader(buf)}, nil
 }
 
 func main() {
