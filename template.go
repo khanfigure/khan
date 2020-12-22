@@ -1,14 +1,8 @@
 package khan
 
 import (
-	"bytes"
-	"context"
-	"encoding/json"
 	"io"
-	"os"
 	"path/filepath"
-
-	"github.com/flosch/pongo2/v4"
 )
 
 type VaultResponse struct {
@@ -29,32 +23,37 @@ func (bdl *bindataloader) Get(path string) (io.Reader, error) {
 	return bdl.run.assetfn(path)
 }
 
-func executeTemplate(r *run, tfile string) (string, error) {
-	ts := pongo2.NewSet("go-bindata", &bindataloader{r})
+func executePackedTemplateFile(r *run, tfile string) (string, error) {
+	v, ok := r.pongocachefiles[tfile]
 
-	tpl, err := ts.FromFile(tfile)
+	if !ok {
+		tpl, err := r.pongopackedset.FromFile(tfile)
+		if err != nil {
+			return "", err
+		}
+		r.pongocachefiles[tfile] = tpl
+		v = tpl
+	}
+
+	buf, err := v.ExecuteBytes(r.pongopackedcontext)
 	if err != nil {
 		return "", err
 	}
-	buf, err := tpl.ExecuteBytes(pongo2.Context{
-		"khan": map[string]interface{}{
-			"secret": func(path string) (map[string]string, error) {
-				buf := &bytes.Buffer{}
-				cmd := r.rioconfig.Command(context.Background(), "vault", "kv", "get", "-format", "json", "secret/"+path)
-				cmd.Shell = true
-				cmd.Stdout = buf
-				cmd.Stderr = os.Stderr
-				if err := cmd.Run(); err != nil {
-					return nil, err
-				}
-				var vr VaultResponse
-				if err := json.Unmarshal(buf.Bytes(), &vr); err != nil {
-					return nil, err
-				}
-				return vr.Data.Data, nil
-			},
-		},
-	})
+	return string(buf), nil
+}
+
+func executePackedTemplateString(r *run, s string) (string, error) {
+	v, ok := r.pongocachestrings[s]
+	if !ok {
+		tpl, err := r.pongopackedset.FromString(s)
+		if err != nil {
+			return "", err
+		}
+		r.pongocachestrings[s] = tpl
+		v = tpl
+	}
+
+	buf, err := v.ExecuteBytes(r.pongopackedcontext)
 	if err != nil {
 		return "", err
 	}

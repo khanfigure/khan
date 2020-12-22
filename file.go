@@ -28,7 +28,10 @@ type File struct {
 	// Local is a path on the configuree for the source of the file
 	Local string
 
-	Template string // TODO remove
+	// Template execution mode. Leave blank for no templating. Special
+	// value "1" is the same as the default templating engine "pongo2",
+	// a jinja2 style template engine. (See https://github.com/flosch/pongo2)
+	Template string
 
 	Delete bool
 
@@ -61,9 +64,6 @@ func (f *File) Validate() error {
 }
 
 func (f *File) StaticFiles() []string {
-	if f.Template != "" {
-		return []string{f.Template}
-	}
 	if f.Src != "" {
 		return []string{f.Src}
 	}
@@ -91,24 +91,42 @@ func (f *File) apply(r *run) (itemStatus, error) {
 	}
 
 	content := f.Content
-	if f.Src != "" {
-		fh, err := r.assetfn(f.Src)
-		if err != nil {
-			return 0, err
-		}
-		defer fh.Close()
-		buf := &bytes.Buffer{}
-		if _, err := io.Copy(buf, fh); err != nil {
-			return 0, err
-		}
-		content = buf.String()
+
+	engine := f.Template
+	if engine == "1" || engine == "true" || engine == "yes" || engine == "pongo" {
+		engine = "pongo2"
 	}
-	if f.Template != "" {
-		var err error
-		content, err = executeTemplate(r, f.Template)
-		if err != nil {
-			return 0, err
+
+	if engine == "pongo2" {
+		if f.Src != "" {
+			var err error
+			if content, err = executePackedTemplateFile(r, f.Src); err != nil {
+				return 0, err
+			}
+		} else {
+			var err error
+			if content, err = executePackedTemplateString(r, f.Content); err != nil {
+				return 0, err
+			}
 		}
+	} else if engine == "" {
+		// raw file mode
+
+		if f.Src != "" {
+			fh, err := r.assetfn(f.Src)
+			if err != nil {
+				return 0, err
+			}
+			defer fh.Close()
+			buf := &bytes.Buffer{}
+			if _, err := io.Copy(buf, fh); err != nil {
+				return 0, err
+			}
+			content = buf.String()
+		}
+		// else: assume Content is the content. (Blank means a blank file.)
+	} else {
+		return 0, fmt.Errorf("Unknown template engine %#v", engine)
 	}
 
 	buf, err := r.rioconfig.ReadFile(f.Path)

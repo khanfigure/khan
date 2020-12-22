@@ -3,6 +3,9 @@ package khan
 import (
 	"flag"
 	"fmt"
+	"bytes"
+	"context"
+	"encoding/json"
 	"net"
 	"os"
 	"strings"
@@ -12,6 +15,7 @@ import (
 	"github.com/desops/sshpool"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
+	"github.com/flosch/pongo2/v4"
 )
 
 var (
@@ -29,6 +33,29 @@ func SetDescribe(s string) {
 func Apply() error {
 	r := &run{
 		assetfn: mainassetfn,
+	}
+
+	r.pongocachefiles = map[string]*pongo2.Template{}
+	r.pongocachestrings = map[string]*pongo2.Template{}
+	r.pongopackedset = pongo2.NewSet("packed", &bindataloader{r})
+	r.pongopackedcontext = pongo2.Context{
+		"khan": map[string]interface{}{
+			"secret": func(path string) (map[string]string, error) {
+				buf := &bytes.Buffer{}
+				cmd := r.rioconfig.Command(context.Background(), "vault", "kv", "get", "-format", "json", "secret/"+path)
+				cmd.Shell = true
+				cmd.Stdout = buf
+				cmd.Stderr = os.Stderr
+				if err := cmd.Run(); err != nil {
+					return nil, err
+				}
+				var vr VaultResponse
+				if err := json.Unmarshal(buf.Bytes(), &vr); err != nil {
+					return nil, err
+				}
+				return vr.Data.Data, nil
+			},
+		},
 	}
 
 	r.rioconfig = &rio.Config{}

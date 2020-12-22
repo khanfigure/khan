@@ -12,6 +12,7 @@ import (
 
 	"github.com/desops/khan/rio"
 
+	"github.com/flosch/pongo2/v4"
 	"github.com/keegancsmith/shell"
 )
 
@@ -36,6 +37,11 @@ type run struct {
 	assetfn func(string) (io.ReadCloser, error)
 
 	out *outputter
+
+	pongopackedset *pongo2.TemplateSet
+	pongopackedcontext pongo2.Context
+	pongocachefiles map[string]*pongo2.Template
+	pongocachestrings map[string]*pongo2.Template
 }
 
 /*func (r *run) addStat(stat string) {
