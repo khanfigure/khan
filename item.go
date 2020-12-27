@@ -9,12 +9,6 @@ type metadata struct {
 	source string
 }
 
-var (
-	nextid int
-	items  []Item
-	meta   map[int]*metadata
-)
-
 type itemStatus int
 
 const (
@@ -43,8 +37,11 @@ func (s itemStatus) String() string {
 type Item interface {
 	setID(id int)
 	getID() int
-	apply(*run) (itemStatus, error)
+	apply(*Run) (itemStatus, error)
 	String() string
+
+	provides() []string
+	needs() []string
 }
 
 type Validator interface {
@@ -57,26 +54,13 @@ type StaticFiler interface {
 func Add(add ...Item) {
 	_, fn, line, _ := runtime.Caller(1)
 	source := fmt.Sprintf("%s:%d", fn, line)
-	AddFromSource(source, add...)
+	if err := run.AddFromSource(source, add...); err != nil {
+		panic(err)
+	}
 }
 
 func AddFromSource(source string, add ...Item) {
-	if meta == nil {
-		meta = make(map[int]*metadata)
-	}
-
-	// adding something gives it a unique id
-
-	for _, item := range add {
-		if item.getID() != 0 {
-			// already added
-			continue
-		}
-		nextid++
-		item.setID(nextid)
-		items = append(items, item)
-		meta[nextid] = &metadata{
-			source: source,
-		}
+	if err := run.AddFromSource(source, add...); err != nil {
+		panic(err)
 	}
 }

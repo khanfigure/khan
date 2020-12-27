@@ -1,26 +1,27 @@
 package khan
 
 import (
-	"flag"
-	"fmt"
 	"bytes"
 	"context"
 	"encoding/json"
+	"flag"
+	"fmt"
 	"net"
 	"os"
-	"strings"
 
 	"github.com/desops/khan/rio"
 
 	"github.com/desops/sshpool"
+	"github.com/flosch/pongo2/v4"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
-	"github.com/flosch/pongo2/v4"
 )
 
 var (
 	describe     string
 	sourceprefix string
+
+	run *Run = &Run{}
 )
 
 func SetSourcePrefix(s string) {
@@ -31,9 +32,10 @@ func SetDescribe(s string) {
 }
 
 func Apply() error {
-	r := &run{
-		assetfn: mainassetfn,
-	}
+
+	r := run
+
+	r.assetfn = mainassetfn
 
 	r.pongocachefiles = map[string]*pongo2.Template{}
 	r.pongocachestrings = map[string]*pongo2.Template{}
@@ -76,20 +78,20 @@ func Apply() error {
 	if r.dry {
 		title += "Dry running"
 	} else {
-		title += "Applying"
+		title += color(Green) + "Applying" + reset()
 	}
-	title += " " + brightcolor(Yellow) + describe + reset() + " on "
+	title += " " + brightcolor(Yellow) + describe + reset()
 
 	if r.host == "" {
 		hostname, err := os.Hostname()
 		if err != nil {
 			return err
 		}
-		title += " " + hostname
+		title += " via SSH on " + hostname
 	} else {
-		title += " " + r.host
+		title += " locally on " + r.host
 	}
-	title += "..."
+	//title += " ..."
 	fmt.Println(title)
 
 	if r.host != "" {
@@ -115,34 +117,18 @@ func Apply() error {
 		r.rioconfig.Host = r.host
 	}
 
-	out := &outputter{}
-	r.out = out
+	//	out := &outputter{}
+	//	r.out = out
 
-	total := len(items)
-	finished := 0
+	//	total := len(items)
+	//	finished := 0
+	//	defer func() {
+	//		fmt.Printf("%d/%d things up to date\n", finished, total)
+	//	}()
 
-	defer func() {
-		fmt.Printf("%d/%d things up to date\n", finished, total)
-	}()
+	//	bar := progress.NewBar(total, "")
+	//	defer bar.Done()
+	//	out.bar = bar
 
-	for _, item := range items {
-		out.StartItem(r, item)
-
-		status, err := item.apply(r)
-
-		out.FinishItem(r, item, status, err)
-
-		if err != nil {
-			// wrap the error with its source
-			md := meta[item.getID()]
-			err = fmt.Errorf("%s %w", strings.TrimPrefix(md.source, sourceprefix+"/"), err)
-			return err
-		}
-
-		if !r.dry || status == itemUnchanged {
-			finished++
-		}
-	}
-
-	return nil
+	return r.run()
 }

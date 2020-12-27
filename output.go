@@ -4,17 +4,20 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/yobert/progress"
 )
 
 type outputter struct {
 	start time.Time
+	bar   *progress.Bar
 }
 
-func (o *outputter) StartItem(r *run, item Item) {
+func (o *outputter) StartItem(r *Run, item Item) {
 	o.start = time.Now()
 }
 
-func (o *outputter) FinishItem(r *run, item Item, status itemStatus, err error) {
+func (o *outputter) FinishItem(r *Run, item Item, status itemStatus, err error) {
 	if err == nil && status == itemUnchanged && !r.verbose {
 		return
 	}
@@ -33,7 +36,13 @@ func (o *outputter) FinishItem(r *run, item Item, status itemStatus, err error) 
 		s = "error"
 	}
 
-	fmt.Printf("%s%8s%s │ %-10s │ %-10s │ %s\n", dc, ds, reset(), typ, s, item.String())
+	msg := fmt.Sprintf("%s%8s%s │ %-10s │ %-10s │ %s", dc, ds, reset(), typ, s, item.String())
+
+	if o.bar != nil {
+		o.bar.Println(msg)
+	} else {
+		fmt.Println(msg)
+	}
 }
 
 func (o *outputter) Flush() {

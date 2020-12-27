@@ -48,7 +48,14 @@ func (u *User) setID(id int) {
 func (u *User) getID() int {
 	return u.id
 }
-func (u *User) apply(r *run) (itemStatus, error) {
+func (u *User) needs() []string {
+	return nil
+}
+func (u *User) provides() []string {
+	return nil
+}
+
+func (u *User) apply(r *Run) (itemStatus, error) {
 	r.userCacheMu.Lock()
 	defer r.userCacheMu.Unlock()
 

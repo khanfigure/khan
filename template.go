@@ -13,7 +13,7 @@ type VaultResponseData struct {
 }
 
 type bindataloader struct {
-	run *run
+	run *Run
 }
 
 func (bdl *bindataloader) Abs(base, name string) string {
@@ -23,7 +23,7 @@ func (bdl *bindataloader) Get(path string) (io.Reader, error) {
 	return bdl.run.assetfn(path)
 }
 
-func executePackedTemplateFile(r *run, tfile string) (string, error) {
+func executePackedTemplateFile(r *Run, tfile string) (string, error) {
 	v, ok := r.pongocachefiles[tfile]
 
 	if !ok {
@@ -42,7 +42,7 @@ func executePackedTemplateFile(r *run, tfile string) (string, error) {
 	return string(buf), nil
 }
 
-func executePackedTemplateString(r *run, s string) (string, error) {
+func executePackedTemplateString(r *Run, s string) (string, error) {
 	v, ok := r.pongocachestrings[s]
 	if !ok {
 		tpl, err := r.pongopackedset.FromString(s)

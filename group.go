@@ -24,8 +24,14 @@ func (g *Group) setID(id int) {
 func (g *Group) getID() int {
 	return g.id
 }
+func (g *Group) needs() []string {
+	return nil
+}
+func (g *Group) provides() []string {
+	return nil
+}
 
-func (g *Group) apply(r *run) (itemStatus, error) {
+func (g *Group) apply(r *Run) (itemStatus, error) {
 	r.userCacheMu.Lock()
 	defer r.userCacheMu.Unlock()
 

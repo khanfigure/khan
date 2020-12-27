@@ -69,6 +69,7 @@ func sync(dest, src string) error {
 
 			// files not same
 			//fmt.Println("file contents changed:", destp, path)
+			//fmt.Println("copying", path)
 		}
 
 		return cp(destp, path)

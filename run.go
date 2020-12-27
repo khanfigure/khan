@@ -1,23 +1,19 @@
 package khan
 
 import (
-	"bufio"
-	"context"
 	"fmt"
 	"io"
-	"os"
-	"strconv"
+	"runtime"
 	"strings"
 	"sync"
 
 	"github.com/desops/khan/rio"
 
 	"github.com/flosch/pongo2/v4"
-	"github.com/keegancsmith/shell"
 )
 
 // The context for an execution on a server
-type run struct {
+type Run struct {
 	dry     bool
 	diff    bool
 	verbose bool
@@ -38,191 +34,237 @@ type run struct {
 
 	out *outputter
 
-	pongopackedset *pongo2.TemplateSet
+	pongopackedset     *pongo2.TemplateSet
 	pongopackedcontext pongo2.Context
-	pongocachefiles map[string]*pongo2.Template
-	pongocachestrings map[string]*pongo2.Template
+	pongocachefiles    map[string]*pongo2.Template
+	pongocachestrings  map[string]*pongo2.Template
+
+	itemsmu   sync.Mutex
+	items     []Item
+	meta      map[int]*metadata
+	nextid    int
+	moreitems chan ([]Item)
 }
 
-/*func (r *run) addStat(stat string) {
+/*func (r *Run) addStat(stat string) {
 	r.statsMu.Lock()
 	r.stats[stat] = r.stats[stat] + 1
 	r.statsMu.Unlock()
 }*/
 
-// Always lock userCacheMu before calling this
-func (r *run) reloadUserGroupCache() error {
-	// already cached!
-	if r.groupCache != nil {
+func (r *Run) Add(add ...Item) error {
+	_, fn, line, _ := runtime.Caller(1)
+	source := fmt.Sprintf("%s:%d", fn, line)
+	return r.AddFromSource(source, add...)
+}
+
+func (r *Run) AddFromSource(source string, add ...Item) error {
+	// careful with this defer ordering:
+	// we want to send on moreitems after unlocking itemsmu,
+	// but we want to make sure we have the lock first to
+	// ensure the moreitems channel has been created.
+	r.itemsmu.Lock()
+	if r.moreitems != nil {
+		defer func() {
+			r.moreitems <- add
+		}()
+	}
+	defer r.itemsmu.Unlock()
+
+	if r.meta == nil {
+		r.meta = make(map[int]*metadata)
+	}
+
+	// adding something gives it a unique id
+
+	for _, item := range add {
+		if item.getID() != 0 {
+			// already added?
+			// maybe we'll allow this later, but avoid for now
+			return fmt.Errorf("Item cannot be added twice")
+			//continue
+		}
+		r.nextid++
+		item.setID(r.nextid)
+		r.items = append(r.items, item)
+		r.meta[r.nextid] = &metadata{
+			source: source,
+		}
+	}
+
+	return nil
+}
+
+func (r *Run) run() error {
+
+	r.out = &outputter{}
+
+	var wg sync.WaitGroup
+
+	var metamu sync.Mutex
+	fences := map[string]*sync.Mutex{}
+	errors := map[string]error{}
+	needed := map[string]bool{}
+
+	wraperr := func(item Item, err error) error {
+		md := r.meta[item.getID()]
+		return fmt.Errorf("%s %w", strings.TrimPrefix(md.source, sourceprefix+"/"), err)
+	}
+
+	additem := func(item Item) error {
+		for _, n := range item.needs() {
+			needed[n] = true
+		}
+		for _, p := range item.provides() {
+			if _, ok := fences[p]; ok {
+				return wraperr(item, fmt.Errorf("Duplicated provider of %#v", p))
+			}
+			fences[p] = &sync.Mutex{}
+			fences[p].Lock()
+		}
 		return nil
 	}
 
-	r.groupCache = map[string]*Group{}
-	r.gidCache = map[int]*Group{}
-	r.userCache = map[string]*User{}
-	r.uidCache = map[int]*User{}
-
-	userGids := map[string]int{}
-
-	u_rows, err := readColonFile(r, "/etc/passwd")
-	if err != nil {
-		return err
+	r.itemsmu.Lock()
+	r.moreitems = make(chan []Item)
+	for _, item := range r.items {
+		if err := additem(item); err != nil {
+			return err
+		}
+		wg.Add(1)
 	}
-	for _, row := range u_rows {
-		if len(row) < 6 {
-			continue
-		}
-		uid, err := strconv.Atoi(row[2])
-		if err != nil {
-			continue
-		}
-		gid, err := strconv.Atoi(row[3])
-		if err != nil {
-			continue
-		}
+	origitems := r.items
+	r.itemsmu.Unlock()
 
-		userGids[row[0]] = gid
+	iexec := make(chan Item)
 
-		u := User{
-			Name:  row[0],
-			Uid:   uid,
-			Gecos: row[4],
-			Home:  row[5],
-			Shell: row[6],
-		}
-		if len(u.Name) == 0 {
-			continue
-		}
-		if u.Name[0] == '+' || u.Name[0] == '-' {
-			continue
-		}
-		r.userCache[u.Name] = &u
-		r.uidCache[u.Uid] = &u
-	}
+	// read for incoming new items added at runtime.
+	// since the channel is blocking, the Add won't return until
+	// the new item is handled here, thus ensuring it gets added
+	// to the waitgroup.
+	go func() {
+		for {
+			items, ok := <-r.moreitems
+			if !ok {
+				return
+			}
+			//fmt.Println("additional item locking")
+			metamu.Lock()
+			//fmt.Println("additional item locking done")
+			for _, item := range items {
+				err := additem(item)
+				if err != nil {
+					panic(err) // yuck: figure this out
+				}
+				wg.Add(1)
+			}
+			metamu.Unlock()
 
-	sh_rows, err := readColonFile(r, "/etc/shadow")
-	if err != nil && iserrnotfound(err) {
-		// try openbsd mode!
-		r.bsdmode = true
-		sh_rows, err = readColonFile(r, "/etc/master.passwd")
-	}
-	if err != nil {
-		return err
-	}
-	for _, row := range sh_rows {
-		if len(row) < 8 {
-			continue
-		}
-		u, ok := r.userCache[row[0]]
-		if !ok {
-			continue
-		}
-
-		if row[1] == "" {
-			u.BlankPassword = true
-		} else if row[1] == "!" || row[1] == "!!" || row[1] == "x" {
-			// This is represented by:
-			//    BlankPassword = false
-			//    Password = ""
-		} else {
-			u.Password = row[1]
-		}
-		// TODO fancy /etc/shadow fields
-	}
-
-	g_rows, err := readColonFile(r, "/etc/group")
-	if err != nil {
-		return err
-	}
-	for _, row := range g_rows {
-		if len(row) < 4 {
-			continue
-		}
-		id, err := strconv.Atoi(row[2])
-		if err != nil {
-			continue
-		}
-		g := Group{
-			Name: row[0],
-			Gid:  id,
-		}
-		if len(g.Name) == 0 {
-			continue
-		}
-		if g.Name[0] == '+' || g.Name[0] == '-' {
-			continue
-		}
-		r.groupCache[g.Name] = &g
-		r.gidCache[g.Gid] = &g
-		for _, u := range strings.Split(row[3], ",") {
-			u = strings.TrimSpace(u)
-			uu, ok := r.userCache[u]
-			if ok {
-				uu.Groups = append(uu.Groups, g.Name)
+			for _, item := range items {
+				iexec <- item
 			}
 		}
-	}
+	}()
 
-	for u, gid := range userGids {
-		user := r.userCache[u]
-		group := r.gidCache[gid]
-		if user != nil && group != nil {
-			user.Group = group.Name
+	errs := make(chan error)
+
+	go func() {
+		//fmt.Println("wg.Wait()")
+		wg.Wait()
+		//fmt.Println("closing errs")
+		close(errs)
+	}()
+
+	go func() {
+		for _, item := range origitems {
+			iexec <- item
+		}
+	}()
+
+	go func() {
+		for {
+			item, ok := <-iexec
+			if !ok {
+				return
+			}
+
+			//fmt.Println(item)
+			go func(item Item) {
+				err := func() error {
+
+					// be a little tricky here to allow fences to appear in the future
+					for {
+						var (
+							mu      *sync.Mutex
+							waiting string
+						)
+						metamu.Lock()
+						for _, n := range item.needs() {
+							m, ok := fences[n]
+							if ok {
+								mu = m
+								waiting = n
+								break
+							}
+						}
+						metamu.Unlock()
+
+						if mu == nil {
+							break
+						}
+
+						//fmt.Println(item, "awaiting", waiting)
+						_ = waiting
+						mu.Lock()
+						mu.Unlock()
+					}
+
+					r.out.StartItem(r, item)
+					status, err := item.apply(r)
+					r.out.FinishItem(r, item, status, err)
+
+					if err != nil {
+						// wrap the error with its source
+						md := r.meta[item.getID()]
+						err = fmt.Errorf("%s %w", strings.TrimPrefix(md.source, sourceprefix+"/"), err)
+						return err
+					}
+
+					//		if !r.dry || status == itemUnchanged {
+					//			finished++
+					//		}
+
+					return nil
+				}()
+
+				metamu.Lock()
+				for _, p := range item.provides() {
+					errors[p] = err
+					mu, ok := fences[p]
+					if ok {
+						mu.Unlock()
+						delete(fences, p)
+					}
+				}
+				metamu.Unlock()
+
+				//r.out.bar.Next()
+				errs <- err
+				wg.Done()
+			}(item)
+		}
+
+	}()
+
+	for {
+		err, ok := <-errs
+		if !ok {
+			// done!
+			return nil
+		}
+		//fmt.Println("err", err)
+		if err != nil {
+			return err
 		}
 	}
-
-	return nil
-}
-
-func readColonFile(r *run, path string) ([][]string, error) {
-	fh, err := r.rioconfig.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer fh.Close()
-
-	var ret [][]string
-	bs := bufio.NewScanner(fh)
-	for bs.Scan() {
-		line := bs.Text()
-		comment := strings.IndexByte(line, '#')
-		if comment != -1 {
-			line = line[:comment]
-		}
-		line = strings.TrimSpace(line)
-		if len(line) == 0 {
-			continue
-		}
-		vals := strings.Split(line, ":")
-		for i, v := range vals {
-			vals[i] = strings.TrimSpace(v)
-		}
-		ret = append(ret, vals)
-	}
-	return ret, bs.Err()
-}
-
-func printExec(r *run, c string, args ...string) error {
-	return printExecStdin(r, nil, c, args...)
-}
-
-func printExecStdin(r *run, stdin io.Reader, c string, args ...string) error {
-	if r.verbose {
-		fmt.Print(shell.ReadableEscapeArg(c))
-		for _, a := range args {
-			fmt.Print(" " + shell.ReadableEscapeArg(a))
-		}
-		fmt.Println()
-	}
-	if r.dry {
-		return nil
-	}
-	cmd := r.rioconfig.Command(context.Background(), c, args...)
-	cmd.Stdin = stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		return err
-	}
-	return nil
 }

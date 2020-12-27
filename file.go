@@ -70,7 +70,17 @@ func (f *File) StaticFiles() []string {
 	return nil
 }
 
-func (f *File) apply(r *run) (itemStatus, error) {
+func (f *File) needs() []string {
+	if f.Local != "" {
+		return []string{"path:" + f.Local}
+	}
+	return nil
+}
+func (f *File) provides() []string {
+	return []string{"path:" + f.Path}
+}
+
+func (f *File) apply(r *Run) (itemStatus, error) {
 	status := itemModified
 
 	if f.Delete {
@@ -103,6 +113,8 @@ func (f *File) apply(r *run) (itemStatus, error) {
 			if content, err = executePackedTemplateFile(r, f.Src); err != nil {
 				return 0, err
 			}
+		} else if f.Local != "" {
+			return 0, fmt.Errorf("FIXME template local mode not supported yet. (security considerations?)")
 		} else {
 			var err error
 			if content, err = executePackedTemplateString(r, f.Content); err != nil {
@@ -111,7 +123,6 @@ func (f *File) apply(r *run) (itemStatus, error) {
 		}
 	} else if engine == "" {
 		// raw file mode
-
 		if f.Src != "" {
 			fh, err := r.assetfn(f.Src)
 			if err != nil {
@@ -123,6 +134,13 @@ func (f *File) apply(r *run) (itemStatus, error) {
 				return 0, err
 			}
 			content = buf.String()
+		} else if f.Local != "" {
+			// copy from another path on managed host
+			srcbuf, err := r.rioconfig.ReadFile(f.Local)
+			if err != nil {
+				return 0, err
+			}
+			content = string(srcbuf)
 		}
 		// else: assume Content is the content. (Blank means a blank file.)
 	} else {
