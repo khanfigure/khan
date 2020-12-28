@@ -15,10 +15,7 @@ import (
 )
 
 var (
-	describe     string
-	sourceprefix string
-
-	run *Run = &Run{
+	defaultrun *Run = &Run{
 		meta:   map[int]*imeta{},
 		fences: map[string]*sync.Mutex{},
 		errors: map[string]error{},
@@ -26,15 +23,17 @@ var (
 )
 
 func SetSourcePrefix(s string) {
-	sourceprefix = s
+	defaultrun.sourceprefix = s
 }
 func SetDescribe(s string) {
-	describe = s
+	defaultrun.describe = s
+}
+func SetTitle(s string) {
+	defaultrun.title = s
 }
 
 func Apply() error {
-
-	r := run
+	r := defaultrun
 
 	r.assetfn = mainassetfn
 
@@ -51,16 +50,19 @@ func Apply() error {
 	pflag.BoolVarP(&r.Diff, "diff", "D", false, "Show full diff of file content changes")
 	pflag.BoolVarP(&r.Verbose, "verbose", "v", false, "Be more verbose")
 
+	localmode := false
+	pflag.BoolVarP(&localmode, "local", "l", false, "Run without SSH against local host as current user")
+
 	pflag.StringVarP(&r.User, "user", "u", "root", "SSH User")
 
 	var hostlist []string
-	pflag.StringSliceVarP(&hostlist, "host", "h", nil, "SSH Host (may be host:port)")
+	pflag.StringSliceVarP(&hostlist, "host", "h", nil, "SSH Host (may be host:port, may be repeated)")
 
 	pflag.Parse()
 
 	anyssh := false
 
-	if len(hostlist) == 0 {
+	if localmode {
 		hostname, err := os.Hostname()
 		if err != nil {
 			return err
@@ -71,7 +73,9 @@ func Apply() error {
 			Virt: NewVirtual(),
 			Run:  r,
 		})
-	} else {
+	}
+
+	if len(hostlist) > 0 {
 		anyssh = true
 		for _, h := range hostlist {
 			name := h
@@ -88,6 +92,11 @@ func Apply() error {
 		}
 	}
 
+	if len(r.Hosts) == 0 {
+		fmt.Println("Nothing to do: No remote hosts (-h/--host) or local host (-l/--local) were specified")
+		return nil
+	}
+
 	title := "███ "
 
 	if r.Dry {
@@ -95,7 +104,7 @@ func Apply() error {
 	} else {
 		title += color(Green) + "Applying" + reset()
 	}
-	title += " " + brightcolor(Yellow) + describe + reset() + " on "
+	title += " " + brightcolor(Yellow) + r.title + reset() + " " + color(Yellow) + r.describe + reset() + " on "
 
 	for i, host := range r.Hosts {
 		if i > 0 {

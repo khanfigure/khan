@@ -25,6 +25,10 @@ type Run struct {
 
 	assetfn func(string) (io.ReadCloser, error)
 
+	sourceprefix string
+	describe     string
+	title        string
+
 	out *outputter
 
 	pongomu            sync.Mutex
@@ -44,12 +48,13 @@ type Run struct {
 }
 
 type inititem struct {
+	run    *Run
 	item   Item
 	source string
 }
 
-func (ii *inititem) WrapError(err error) error {
-	return fmt.Errorf("%s %s: %w", strings.TrimPrefix(ii.source, sourceprefix+"/"), ii.item, err)
+func (ii *inititem) WrapError(run *Run, err error) error {
+	return fmt.Errorf("%s %s: %w", strings.TrimPrefix(ii.source, run.sourceprefix+"/"), ii.item, err)
 }
 
 type imeta struct {
@@ -58,8 +63,8 @@ type imeta struct {
 	host   *Host
 }
 
-func (im *imeta) WrapError(err error) error {
-	return fmt.Errorf("%s %s on %s: %w", strings.TrimPrefix(im.source, sourceprefix+"/"), im.item, im.host.Name, err)
+func (im *imeta) WrapError(run *Run, err error) error {
+	return fmt.Errorf("%s %s on %s: %w", strings.TrimPrefix(im.source, run.sourceprefix+"/"), im.item, im.host.Name, err)
 }
 
 // Add will clone items for each configured host and add them to the run graph
@@ -123,7 +128,7 @@ func (r *Run) addHostItem(host *Host, source string, item Item) error {
 	for _, p := range item.Provides() {
 		p = host.Key() + "-" + p
 		if _, ok := r.fences[p]; ok {
-			return im.WrapError(fmt.Errorf("Duplicate provider of %#v", p))
+			return im.WrapError(r, fmt.Errorf("Duplicate provider of %#v", p))
 		}
 		r.fences[p] = &sync.Mutex{}
 		r.fences[p].Lock()
@@ -143,7 +148,7 @@ func (r *Run) runinit() error {
 
 	for _, iitem := range r.inititems {
 		if iitem.item.ID() != 0 {
-			return iitem.WrapError(fmt.Errorf("Item already added"))
+			return iitem.WrapError(r, fmt.Errorf("Item already added"))
 		}
 		for _, host := range r.Hosts {
 			c := iitem.item.Clone()
@@ -231,7 +236,7 @@ func (r *Run) run() error {
 					start := time.Now()
 					status, err := item.Apply(host)
 					if err != nil {
-						err = ex.im.WrapError(err)
+						err = ex.im.WrapError(r, err)
 					}
 					r.out.FinishItem(start, r, item, status, err)
 

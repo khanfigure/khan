@@ -22,5 +22,13 @@ func initialize() error {
 		}
 	}
 
+	if _, err := os.Stat("go.sum"); err != nil {
+		fh, err := os.Create("go.sum")
+		if err != nil {
+			return err
+		}
+		fh.Close()
+	}
+
 	return nil
 }

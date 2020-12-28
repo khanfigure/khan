@@ -58,14 +58,14 @@ type StaticFiler interface {
 func Add(add ...Item) {
 	_, fn, line, _ := runtime.Caller(1)
 	source := fmt.Sprintf("%s:%d", fn, line)
-	if err := run.AddFromSource(source, add...); err != nil {
+	if err := defaultrun.AddFromSource(source, add...); err != nil {
 		panic(err)
 	}
 }
 
 // Add to the default run context with explicit source path
 func AddFromSource(source string, add ...Item) {
-	if err := run.AddFromSource(source, add...); err != nil {
+	if err := defaultrun.AddFromSource(source, add...); err != nil {
 		panic(err)
 	}
 }

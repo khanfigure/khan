@@ -22,12 +22,28 @@ type buildrun struct {
 
 func build() error {
 
-	cmd := exec.Command("git", "describe", "--all", "--long", "--dirty")
-	cmd.Stderr = os.Stderr
-	describe, err := cmd.Output()
+	describe := "unknown"
+
+	if _, err := os.Stat(".git"); err == nil {
+		cmd := exec.Command("git", "describe", "--all", "--long", "--dirty")
+		buf, err := cmd.Output()
+		if err == nil {
+			describe = string(buf)
+		}
+	}
+
+	if _, err := os.Stat("go.mod"); err != nil {
+		return fmt.Errorf("Uninitialized khan configuration, or not executed from project root. Initialize with: khan init")
+	}
+
+	buf, err := exec.Command("go", "list", "-m").Output()
 	if err != nil {
 		return err
 	}
+
+	outfile := strings.TrimSpace(string(buf))
+
+	title := outfile
 
 	// Enter a private space in /tmp so that we don't clutter the cwd with
 	// generated intermediate crap. This space will persist: it is based on
@@ -50,8 +66,6 @@ func build() error {
 	if err != nil {
 		return err
 	}
-
-	outfile := "execute"
 
 	br := &buildrun{
 		wd:  wd,
@@ -143,6 +157,7 @@ func assetfn(path string) (io.ReadCloser, error) {
 }
 
 func main() {
+	%s.SetTitle(%#v)
 	%s.SetSourcePrefix(%#v)
 	%s.SetDescribe(%#v)
 	%s.SetAssetLoader(assetfn)
@@ -152,14 +167,14 @@ func main() {
 		os.Exit(1)
 	}
 }
-`, khanpkgalias, khanpkgname, khanpkgalias, wd, khanpkgalias, strings.TrimSpace(string(describe)), khanpkgalias, khanpkgalias)), 0644); err != nil {
+`, khanpkgalias, khanpkgname, khanpkgalias, title, khanpkgalias, wd, khanpkgalias, strings.TrimSpace(describe), khanpkgalias, khanpkgalias)), 0644); err != nil {
 			return err
 		}
 	}
 
 	fmt.Println("Compiling ...")
 
-	cmd = exec.Command("go", "build", "-o", cwd+"/"+outfile)
+	cmd := exec.Command("go", "build", "-o", cwd+"/"+outfile)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Dir = wd

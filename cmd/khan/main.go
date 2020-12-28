@@ -8,6 +8,8 @@ import (
 var cmds = map[string]func() error{
 	"build": build,
 	"init":  initialize,
+	//"go": gocmd, // At first I thought I'd need this but now I can't find a use for it
+	"clean": clean,
 }
 
 func main() {
