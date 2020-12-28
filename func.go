@@ -4,7 +4,7 @@ import (
 	"errors"
 )
 
-type FuncType func(*Run) error
+type FuncType func(*Host) error
 
 type Function struct {
 	Fn FuncType
@@ -21,11 +21,16 @@ func (f *Function) String() string {
 	return "function"
 }
 
-func (f *Function) setID(id int) {
+func (f *Function) SetID(id int) {
 	f.id = id
 }
-func (f *Function) getID() int {
+func (f *Function) ID() int {
 	return f.id
+}
+func (f *Function) Clone() Item {
+	r := *f
+	r.id = 0
+	return &r
 }
 
 func (f *Function) Validate() error {
@@ -39,13 +44,13 @@ func (f *Function) StaticFiles() []string {
 	return nil
 }
 
-func (f *Function) needs() []string {
+func (f *Function) Needs() []string {
 	return nil
 }
-func (f *Function) provides() []string {
+func (f *Function) Provides() []string {
 	return nil
 }
 
-func (f *Function) apply(r *Run) (itemStatus, error) {
-	return itemUnchanged, f.Fn(r)
+func (f *Function) Apply(host *Host) (itemStatus, error) {
+	return itemUnchanged, f.Fn(host)
 }

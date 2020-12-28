@@ -42,11 +42,16 @@ func (f *File) String() string {
 	return f.Path
 }
 
-func (f *File) setID(id int) {
+func (f *File) SetID(id int) {
 	f.id = id
 }
-func (f *File) getID() int {
+func (f *File) ID() int {
 	return f.id
+}
+func (f *File) Clone() Item {
+	r := *f
+	r.id = 0
+	return &r
 }
 
 func (f *File) Validate() error {
@@ -70,34 +75,34 @@ func (f *File) StaticFiles() []string {
 	return nil
 }
 
-func (f *File) needs() []string {
+func (f *File) Needs() []string {
 	if f.Local != "" {
 		return []string{"path:" + f.Local}
 	}
 	return nil
 }
-func (f *File) provides() []string {
+func (f *File) Provides() []string {
 	return []string{"path:" + f.Path}
 }
 
-func (f *File) apply(r *Run) (itemStatus, error) {
+func (f *File) Apply(host *Host) (itemStatus, error) {
 	status := itemModified
 
 	if f.Delete {
-		_, err := r.rioconfig.Stat(f.Path)
+		_, err := host.Stat(f.Path)
 		if err != nil && iserrnotfound(err) {
 			return itemUnchanged, nil
 		}
-		if r.verbose && err != nil {
+		if host.Run.Verbose && err != nil {
 			fmt.Fprintln(os.Stderr, "stat", f.Path, "error:", err)
 		}
 
 		status = itemDeleted
 
-		if r.dry {
+		if host.Run.Dry {
 			return status, nil
 		}
-		return status, r.rioconfig.Remove(f.Path)
+		return status, host.Remove(f.Path)
 	}
 
 	content := f.Content
@@ -110,21 +115,21 @@ func (f *File) apply(r *Run) (itemStatus, error) {
 	if engine == "pongo2" {
 		if f.Src != "" {
 			var err error
-			if content, err = executePackedTemplateFile(r, f.Src); err != nil {
+			if content, err = executePackedTemplateFile(host, f.Src); err != nil {
 				return 0, err
 			}
 		} else if f.Local != "" {
 			return 0, fmt.Errorf("FIXME template local mode not supported yet. (security considerations?)")
 		} else {
 			var err error
-			if content, err = executePackedTemplateString(r, f.Content); err != nil {
+			if content, err = executePackedTemplateString(host, f.Content); err != nil {
 				return 0, err
 			}
 		}
 	} else if engine == "" {
 		// raw file mode
 		if f.Src != "" {
-			fh, err := r.assetfn(f.Src)
+			fh, err := host.Run.assetfn(f.Src)
 			if err != nil {
 				return 0, err
 			}
@@ -136,7 +141,7 @@ func (f *File) apply(r *Run) (itemStatus, error) {
 			content = buf.String()
 		} else if f.Local != "" {
 			// copy from another path on managed host
-			srcbuf, err := r.rioconfig.ReadFile(f.Local)
+			srcbuf, err := host.ReadFile(f.Local)
 			if err != nil {
 				return 0, err
 			}
@@ -147,7 +152,7 @@ func (f *File) apply(r *Run) (itemStatus, error) {
 		return 0, fmt.Errorf("Unknown template engine %#v", engine)
 	}
 
-	buf, err := r.rioconfig.ReadFile(f.Path)
+	buf, err := host.ReadFile(f.Path)
 	if err == nil && bytes.Compare(buf, []byte(content)) == 0 {
 		return itemUnchanged, nil
 	}
@@ -160,7 +165,7 @@ func (f *File) apply(r *Run) (itemStatus, error) {
 			// we should continue with writing to it.
 			//		status = itemModified
 			//		if err != nil {
-			//			if r.verbose {
+			//			if host.Run.Verbose {
 			//				fmt.Printf("Error reading %#v: %v\n", f.Path, err)
 			//			}
 			//		}
@@ -170,7 +175,7 @@ func (f *File) apply(r *Run) (itemStatus, error) {
 		}
 	}
 
-	if r.diff {
+	if host.Run.Diff {
 		// This is cute but actually ugly.
 		//dmp := diffmatchpatch.New()
 		//diffs := dmp.DiffMain(string(buf), content, true)
@@ -189,11 +194,11 @@ func (f *File) apply(r *Run) (itemStatus, error) {
 		fmt.Print(difftxt)
 	}
 
-	if r.dry {
+	if host.Run.Dry {
 		return status, nil
 	}
 
-	fh, err := r.rioconfig.Create(f.Path)
+	fh, err := host.Create(f.Path)
 	if err != nil {
 		return 0, err
 	}

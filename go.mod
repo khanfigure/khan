@@ -8,6 +8,7 @@ require (
 	github.com/go-bindata/go-bindata/v3 v3.1.3
 	github.com/keegancsmith/shell v0.0.0-20160208231706-ccb53e0c7c5c
 	github.com/pmezard/go-difflib v1.0.0
+	github.com/spf13/pflag v1.0.5
 	github.com/yobert/progress v0.0.0-20201227082241-20210b9828cd
 	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad
 	golang.org/x/sys v0.0.0-20201221093633-bc327ba9c2f0 // indirect

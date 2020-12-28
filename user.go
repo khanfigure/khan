@@ -1,11 +1,11 @@
 package khan
 
 import (
-	"bytes"
 	"fmt"
+	/*"bytes"
 	"sort"
 	"strconv"
-	"strings"
+	"strings"*/
 )
 
 type User struct {
@@ -42,21 +42,27 @@ func (u *User) String() string {
 	return fmt.Sprintf("%s/%d", u.Name, u.Uid)
 }
 
-func (u *User) setID(id int) {
+func (u *User) SetID(id int) {
 	u.id = id
 }
-func (u *User) getID() int {
+func (u *User) ID() int {
 	return u.id
 }
-func (u *User) needs() []string {
+func (u *User) Clone() Item {
+	r := *u
+	r.id = 0
+	return &r
+}
+func (u *User) Needs() []string {
 	return nil
 }
-func (u *User) provides() []string {
+func (u *User) Provides() []string {
 	return nil
 }
 
-func (u *User) apply(r *Run) (itemStatus, error) {
-	r.userCacheMu.Lock()
+func (u *User) Apply(host *Host) (itemStatus, error) {
+	return itemUnchanged, nil
+/*	r.userCacheMu.Lock()
 	defer r.userCacheMu.Unlock()
 
 	if err := r.reloadUserGroupCache(); err != nil {
@@ -216,5 +222,5 @@ func (u *User) apply(r *Run) (itemStatus, error) {
 	if modified {
 		return itemModified, nil
 	}
-	return itemUnchanged, nil
+	return itemUnchanged, nil*/
 }

@@ -35,13 +35,16 @@ func (s itemStatus) String() string {
 }
 
 type Item interface {
-	setID(id int)
-	getID() int
-	apply(*Run) (itemStatus, error)
+	SetID(id int)
+	ID() int
+
+	Clone() Item
 	String() string
 
-	provides() []string
-	needs() []string
+	Apply(host *Host) (itemStatus, error)
+
+	Provides() []string
+	Needs() []string
 }
 
 type Validator interface {
@@ -51,6 +54,7 @@ type StaticFiler interface {
 	StaticFiles() []string
 }
 
+// Add to the default run context
 func Add(add ...Item) {
 	_, fn, line, _ := runtime.Caller(1)
 	source := fmt.Sprintf("%s:%d", fn, line)
@@ -59,6 +63,7 @@ func Add(add ...Item) {
 	}
 }
 
+// Add to the default run context with explicit source path
 func AddFromSource(source string, add ...Item) {
 	if err := run.AddFromSource(source, add...); err != nil {
 		panic(err)

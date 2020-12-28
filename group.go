@@ -2,7 +2,7 @@ package khan
 
 import (
 	"fmt"
-	"strconv"
+//	"strconv"
 )
 
 type Group struct {
@@ -18,21 +18,27 @@ func (g *Group) String() string {
 	return fmt.Sprintf("%s/%d", g.Name, g.Gid)
 }
 
-func (g *Group) setID(id int) {
+func (g *Group) SetID(id int) {
 	g.id = id
 }
-func (g *Group) getID() int {
+func (g *Group) ID() int {
 	return g.id
 }
-func (g *Group) needs() []string {
+func (g *Group) Clone() Item {
+	r := *g
+	r.id = 0
+	return &r
+}
+func (g *Group) Needs() []string {
 	return nil
 }
-func (g *Group) provides() []string {
+func (g *Group) Provides() []string {
 	return nil
 }
 
-func (g *Group) apply(r *Run) (itemStatus, error) {
-	r.userCacheMu.Lock()
+func (g *Group) Apply(host *Host) (itemStatus, error) {
+	return itemUnchanged, nil
+/*	r.userCacheMu.Lock()
 	defer r.userCacheMu.Unlock()
 
 	if err := r.reloadUserGroupCache(); err != nil {
@@ -112,5 +118,5 @@ func (g *Group) apply(r *Run) (itemStatus, error) {
 		return itemModified, nil
 	}
 
-	return itemUnchanged, nil
+	return itemUnchanged, nil*/
 }

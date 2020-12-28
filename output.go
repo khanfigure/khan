@@ -18,7 +18,7 @@ func (o *outputter) StartItem(r *Run, item Item) {
 }
 
 func (o *outputter) FinishItem(r *Run, item Item, status itemStatus, err error) {
-	if err == nil && status == itemUnchanged && !r.verbose {
+	if err == nil && status == itemUnchanged && !r.Verbose {
 		return
 	}
 

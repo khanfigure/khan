@@ -7,264 +7,265 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/desops/khan/rio"
+	"github.com/desops/sshpool"
 
 	"github.com/flosch/pongo2/v4"
 )
 
-// The context for an execution on a server
+// Run is the context for an execution run, on one or more servers.
 type Run struct {
-	dry     bool
-	diff    bool
-	verbose bool
+	Dry     bool
+	Diff    bool
+	Verbose bool
 
-	host string
-	user string
-
-	rioconfig *rio.Config
-
-	userCacheMu sync.Mutex
-	userCache   map[string]*User
-	uidCache    map[int]*User
-	groupCache  map[string]*Group
-	gidCache    map[int]*Group
-	bsdmode     bool
+	Pool *sshpool.Pool
+	Hosts []*Host
+	User string
 
 	assetfn func(string) (io.ReadCloser, error)
 
 	out *outputter
 
+	pongomu sync.Mutex
 	pongopackedset     *pongo2.TemplateSet
 	pongopackedcontext pongo2.Context
 	pongocachefiles    map[string]*pongo2.Template
 	pongocachestrings  map[string]*pongo2.Template
 
 	itemsmu   sync.Mutex
+	initdone bool
+	inititems []*inititem // items added at init() time -- need more processing before they're valid
 	items     []Item
-	meta      map[int]*metadata
+	meta map[int]*imeta
 	nextid    int
-	moreitems chan ([]Item)
+	fences map[string]*sync.Mutex
+	errors map[string]error
 }
 
-/*func (r *Run) addStat(stat string) {
-	r.statsMu.Lock()
-	r.stats[stat] = r.stats[stat] + 1
-	r.statsMu.Unlock()
-}*/
+type inititem struct {
+	item Item
+	source string
+}
 
+func (ii *inititem) WrapError(err error) error {
+	return fmt.Errorf("%s %s: %w", strings.TrimPrefix(ii.source, sourceprefix+"/"), ii.item, err)
+}
+
+type imeta struct {
+	item Item
+	source string
+	host *Host
+}
+
+func (im *imeta) WrapError(err error) error {
+	return fmt.Errorf("%s %s on %s: %w", strings.TrimPrefix(im.source, sourceprefix+"/"), im.item, im.host.Name, err)
+}
+
+// Add will clone items for each configured host and add them to the run graph
 func (r *Run) Add(add ...Item) error {
 	_, fn, line, _ := runtime.Caller(1)
 	source := fmt.Sprintf("%s:%d", fn, line)
 	return r.AddFromSource(source, add...)
 }
 
+// AddFromSource is like Add but with explicit source code path
 func (r *Run) AddFromSource(source string, add ...Item) error {
-	// careful with this defer ordering:
-	// we want to send on moreitems after unlocking itemsmu,
-	// but we want to make sure we have the lock first to
-	// ensure the moreitems channel has been created.
 	r.itemsmu.Lock()
-	if r.moreitems != nil {
-		defer func() {
-			r.moreitems <- add
-		}()
-	}
 	defer r.itemsmu.Unlock()
 
-	if r.meta == nil {
-		r.meta = make(map[int]*metadata)
+	if !r.initdone {
+		for _, item := range add {
+			r.inititems = append(r.inititems, &inititem{
+				item: item,
+				source: source,
+			})
+		}
+		return nil
 	}
 
-	// adding something gives it a unique id
-
 	for _, item := range add {
-		if item.getID() != 0 {
-			// already added?
-			// maybe we'll allow this later, but avoid for now
-			return fmt.Errorf("Item cannot be added twice")
-			//continue
+		if item.ID() != 0 {
+			return fmt.Errorf("Item already added: %v", item)
 		}
-		r.nextid++
-		item.setID(r.nextid)
-		r.items = append(r.items, item)
-		r.meta[r.nextid] = &metadata{
-			source: source,
+		for _, host := range r.Hosts {
+			c := item.Clone()
+			if err := r.addHostItem(host, source, c); err != nil {
+				return err
+			}
 		}
 	}
 
 	return nil
 }
 
+// always have itemsmu locked before calling this
+func (r *Run) addHostItem(host *Host, source string, item Item) error {
+		if item.ID() != 0 {
+			return fmt.Errorf("Item cannot be added twice: %v", item)
+		}
+
+		r.nextid++
+		id := r.nextid
+
+		item.SetID(id)
+
+		im := &imeta{
+			source: source,
+			host: host,
+			item: item,
+		}
+
+		r.meta[id] = im
+		r.items = append(r.items, item)
+
+		// create fences for things item provides
+		for _, p := range item.Provides() {
+			p = host.Key()+"-"+p
+			if _, ok := r.fences[p]; ok {
+				return im.WrapError(fmt.Errorf("Duplicate provider of %#v", p))
+			}
+			r.fences[p] = &sync.Mutex{}
+			r.fences[p].Lock()
+		}
+
+	return nil
+}
+
+func (r *Run) runinit() error {
+	// Do some initialization for items queued up at init() time.
+	// Now that we have a proper host list, we can clone the items
+	// for each host.
+	r.itemsmu.Lock()
+	defer r.itemsmu.Unlock()
+
+	r.initdone = true
+
+	for _, iitem := range r.inititems {
+		if iitem.item.ID() != 0 {
+			return iitem.WrapError(fmt.Errorf("Item already added"))
+		}
+		for _, host := range r.Hosts {
+			c := iitem.item.Clone()
+			if err := r.addHostItem(host, iitem.source, c); err != nil {
+				return err
+			}
+		}
+	}
+
+	r.inititems = nil
+
+	return nil
+}
+
 func (r *Run) run() error {
+	if err := r.runinit(); err != nil {
+		return err
+	}
 
 	r.out = &outputter{}
 
-	var wg sync.WaitGroup
-
-	var metamu sync.Mutex
-	fences := map[string]*sync.Mutex{}
-	errors := map[string]error{}
-	needed := map[string]bool{}
-
-	wraperr := func(item Item, err error) error {
-		md := r.meta[item.getID()]
-		return fmt.Errorf("%s %w", strings.TrimPrefix(md.source, sourceprefix+"/"), err)
-	}
-
-	additem := func(item Item) error {
-		for _, n := range item.needs() {
-			needed[n] = true
-		}
-		for _, p := range item.provides() {
-			if _, ok := fences[p]; ok {
-				return wraperr(item, fmt.Errorf("Duplicated provider of %#v", p))
-			}
-			fences[p] = &sync.Mutex{}
-			fences[p].Lock()
-		}
-		return nil
-	}
-
-	r.itemsmu.Lock()
-	r.moreitems = make(chan []Item)
-	for _, item := range r.items {
-		if err := additem(item); err != nil {
-			return err
-		}
-		wg.Add(1)
-	}
-	origitems := r.items
-	r.itemsmu.Unlock()
-
-	iexec := make(chan Item)
-
-	// read for incoming new items added at runtime.
-	// since the channel is blocking, the Add won't return until
-	// the new item is handled here, thus ensuring it gets added
-	// to the waitgroup.
-	go func() {
-		for {
-			items, ok := <-r.moreitems
-			if !ok {
-				return
-			}
-			//fmt.Println("additional item locking")
-			metamu.Lock()
-			//fmt.Println("additional item locking done")
-			for _, item := range items {
-				err := additem(item)
-				if err != nil {
-					panic(err) // yuck: figure this out
-				}
-				wg.Add(1)
-			}
-			metamu.Unlock()
-
-			for _, item := range items {
-				iexec <- item
-			}
-		}
-	}()
-
 	errs := make(chan error)
 
-	go func() {
-		//fmt.Println("wg.Wait()")
-		wg.Wait()
-		//fmt.Println("closing errs")
-		close(errs)
-	}()
+	type iexec struct {
+		item Item
+		im *imeta
+	}
 
-	go func() {
-		for _, item := range origitems {
-			iexec <- item
+	var (
+		exec []*iexec
+		running int
+		firsterr error
+		executed = map[int]bool{}
+	)
+
+	for {
+
+	r.itemsmu.Lock()
+	for _, item := range r.items {
+		if executed[item.ID()] {
+			continue
 		}
-	}()
+		executed[item.ID()] = true
+		exec = append(exec, &iexec{
+			item: item,
+			im: r.meta[item.ID()],
+		})
+	}
+	r.itemsmu.Unlock()
 
-	go func() {
-		for {
-			item, ok := <-iexec
-			if !ok {
-				return
-			}
+	for _, ex := range exec {
+		running++
+		go func(ex *iexec) {
+			item := ex.item
+			host := ex.im.host
 
-			//fmt.Println(item)
-			go func(item Item) {
 				err := func() error {
-
 					// be a little tricky here to allow fences to appear in the future
 					for {
 						var (
 							mu      *sync.Mutex
-							waiting string
+							//waiting string
 						)
-						metamu.Lock()
-						for _, n := range item.needs() {
-							m, ok := fences[n]
+						r.itemsmu.Lock()
+						for _, n := range item.Needs() {
+							n = host.Key()+"-"+n
+							m, ok := r.fences[n]
 							if ok {
 								mu = m
-								waiting = n
+								//waiting = n
 								break
 							}
 						}
-						metamu.Unlock()
+						r.itemsmu.Unlock()
 
 						if mu == nil {
 							break
 						}
 
 						//fmt.Println(item, "awaiting", waiting)
-						_ = waiting
 						mu.Lock()
 						mu.Unlock()
 					}
 
 					r.out.StartItem(r, item)
-					status, err := item.apply(r)
+					status, err := item.Apply(host)
+					if err != nil {
+						err = ex.im.WrapError(err)
+					}
 					r.out.FinishItem(r, item, status, err)
 
-					if err != nil {
-						// wrap the error with its source
-						md := r.meta[item.getID()]
-						err = fmt.Errorf("%s %w", strings.TrimPrefix(md.source, sourceprefix+"/"), err)
-						return err
-					}
-
-					//		if !r.dry || status == itemUnchanged {
-					//			finished++
-					//		}
-
-					return nil
+					return err
 				}()
 
-				metamu.Lock()
-				for _, p := range item.provides() {
-					errors[p] = err
-					mu, ok := fences[p]
+				r.itemsmu.Lock()
+				for _, p := range item.Provides() {
+					p = host.Key()+"-"+p
+					r.errors[p] = err
+					mu, ok := r.fences[p]
 					if ok {
 						mu.Unlock()
-						delete(fences, p)
+						delete(r.fences, p)
 					}
 				}
-				metamu.Unlock()
+				r.itemsmu.Unlock()
 
-				//r.out.bar.Next()
-				errs <- err
-				wg.Done()
-			}(item)
-		}
+				errs<-err
+		}(ex)
+	}
 
-	}()
+	exec = nil
 
-	for {
-		err, ok := <-errs
-		if !ok {
-			// done!
-			return nil
-		}
-		//fmt.Println("err", err)
-		if err != nil {
-			return err
-		}
+	if running == 0 {
+		return firsterr
+	}
+
+	// wait for something to finish
+	err := <-errs
+	running--
+
+	if err != nil && firsterr == nil {
+		firsterr = err
+	}
+
 	}
 }

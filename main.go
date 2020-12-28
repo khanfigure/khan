@@ -1,16 +1,13 @@
 package khan
 
 import (
-	"bytes"
-	"context"
-	"encoding/json"
-	"flag"
+	"strings"
+	"sync"
 	"fmt"
 	"net"
 	"os"
 
-	"github.com/desops/khan/rio"
-
+	"github.com/spf13/pflag"
 	"github.com/desops/sshpool"
 	"github.com/flosch/pongo2/v4"
 	"golang.org/x/crypto/ssh"
@@ -21,7 +18,11 @@ var (
 	describe     string
 	sourceprefix string
 
-	run *Run = &Run{}
+	run *Run = &Run{
+		meta: map[int]*imeta{},
+		fences: map[string]*sync.Mutex{},
+		errors: map[string]error{},
+	}
 )
 
 func SetSourcePrefix(s string) {
@@ -41,60 +42,70 @@ func Apply() error {
 	r.pongocachestrings = map[string]*pongo2.Template{}
 	r.pongopackedset = pongo2.NewSet("packed", &bindataloader{r})
 	r.pongopackedcontext = pongo2.Context{
-		"khan": map[string]interface{}{
-			"secret": func(path string) (map[string]string, error) {
-				buf := &bytes.Buffer{}
-				cmd := r.rioconfig.Command(context.Background(), "vault", "kv", "get", "-format", "json", "secret/"+path)
-				cmd.Shell = true
-				cmd.Stdout = buf
-				cmd.Stderr = os.Stderr
-				if err := cmd.Run(); err != nil {
-					return nil, err
-				}
-				var vr VaultResponse
-				if err := json.Unmarshal(buf.Bytes(), &vr); err != nil {
-					return nil, err
-				}
-				return vr.Data.Data, nil
-			},
-		},
+		"khan": map[string]interface{}{},
 	}
 
-	r.rioconfig = &rio.Config{}
+	//r.rioconfig = &rio.Config{}
 
-	flag.BoolVar(&r.dry, "d", false, "Dry run; Don't make any changes")
-	flag.BoolVar(&r.diff, "D", false, "Show full diff of file content changes")
-	flag.BoolVar(&r.verbose, "v", false, "Be more verbose")
+	pflag.BoolVarP(&r.Dry, "dry", "d", false, "Dry run; Don't make any changes")
+	pflag.BoolVarP(&r.Diff, "diff", "D", false, "Show full diff of file content changes")
+	pflag.BoolVarP(&r.Verbose, "verbose", "v", false, "Be more verbose")
 
-	flag.StringVar(&r.host, "host", "", "Execute on host via SSH")
-	flag.StringVar(&r.user, "user", os.Getenv("USER"), "User to SSH as")
+	pflag.StringVarP(&r.User, "user", "u", "root", "SSH User")
 
-	flag.Parse()
+	var hostlist []string
+	pflag.StringSliceVarP(&hostlist, "host", "h", nil, "SSH Host (may be host:port)")
 
-	r.rioconfig.Verbose = r.verbose
+	pflag.Parse()
 
-	title := "███ "
+	anyssh := false
 
-	if r.dry {
-		title += "Dry running"
-	} else {
-		title += color(Green) + "Applying" + reset()
-	}
-	title += " " + brightcolor(Yellow) + describe + reset()
-
-	if r.host == "" {
+	if len(hostlist) == 0 {
 		hostname, err := os.Hostname()
 		if err != nil {
 			return err
 		}
-		title += " via SSH on " + hostname
+		r.Hosts = append(r.Hosts, &Host{
+			Name: hostname,
+			SSH: false,
+			Virt: NewVirtual(),
+			Run: r,
+		})
 	} else {
-		title += " locally on " + r.host
+		anyssh = true
+		for _, h := range hostlist {
+		name := h
+		if i := strings.IndexByte(name, ':'); i > -1 {
+			name = name[:i]
+		}
+		r.Hosts = append(r.Hosts, &Host{
+			Name: name,
+			SSH: true,
+			Host: h,
+			Virt: NewVirtual(),
+			Run: r,
+		})
+		}
 	}
-	//title += " ..."
+
+	title := "███ "
+
+	if r.Dry {
+		title += "Dry running"
+	} else {
+		title += color(Green) + "Applying" + reset()
+	}
+	title += " " + brightcolor(Yellow) + describe + reset() + " on "
+
+	for i, host := range r.Hosts {
+		if i > 0 {
+			title += ", "
+		}
+		title += host.String()
+	}
 	fmt.Println(title)
 
-	if r.host != "" {
+	if anyssh {
 		socket := os.Getenv("SSH_AUTH_SOCK")
 		conn, err := net.Dial("unix", socket)
 		if err != nil {
@@ -102,7 +113,7 @@ func Apply() error {
 		}
 		agentClient := agent.NewClient(conn)
 		sshconfig := &ssh.ClientConfig{
-			User: r.user,
+			User: r.User,
 			Auth: []ssh.AuthMethod{
 				ssh.PublicKeysCallback(agentClient.Signers),
 			},
@@ -113,22 +124,8 @@ func Apply() error {
 			BannerCallback: ssh.BannerDisplayStderr(),
 		}
 
-		r.rioconfig.Pool = sshpool.New(sshconfig, &sshpool.PoolConfig{Debug: r.verbose})
-		r.rioconfig.Host = r.host
+		r.Pool = sshpool.New(sshconfig, &sshpool.PoolConfig{Debug: r.Verbose})
 	}
-
-	//	out := &outputter{}
-	//	r.out = out
-
-	//	total := len(items)
-	//	finished := 0
-	//	defer func() {
-	//		fmt.Printf("%d/%d things up to date\n", finished, total)
-	//	}()
-
-	//	bar := progress.NewBar(total, "")
-	//	defer bar.Done()
-	//	out.bar = bar
 
 	return r.run()
 }

@@ -9,22 +9,24 @@ import (
 	"github.com/keegancsmith/shell"
 )
 
-func printExec(r *Run, c string, args ...string) error {
-	return printExecStdin(r, nil, c, args...)
+func printExec(host *Host, c string, args ...string) error {
+	return printExecStdin(host, nil, c, args...)
 }
 
-func printExecStdin(r *Run, stdin io.Reader, c string, args ...string) error {
-	if r.verbose {
+func printExecStdin(host *Host, stdin io.Reader, c string, args ...string) error {
+	r := host.Run
+
+	if r.Verbose {
 		fmt.Print(shell.ReadableEscapeArg(c))
 		for _, a := range args {
 			fmt.Print(" " + shell.ReadableEscapeArg(a))
 		}
 		fmt.Println()
 	}
-	if r.dry {
+	if r.Dry {
 		return nil
 	}
-	cmd := r.rioconfig.Command(context.Background(), c, args...)
+	cmd := host.Command(context.Background(), c, args...)
 	cmd.Stdin = stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
