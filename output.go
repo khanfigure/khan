@@ -4,25 +4,17 @@ import (
 	"fmt"
 	"strings"
 	"time"
-
-	"github.com/yobert/progress"
 )
 
 type outputter struct {
-	start time.Time
-	bar   *progress.Bar
 }
 
-func (o *outputter) StartItem(r *Run, item Item) {
-	o.start = time.Now()
-}
-
-func (o *outputter) FinishItem(r *Run, item Item, status itemStatus, err error) {
+func (o *outputter) FinishItem(start time.Time, r *Run, item Item, status itemStatus, err error) {
 	if err == nil && status == itemUnchanged && !r.Verbose {
 		return
 	}
 
-	d := time.Since(o.start)
+	d := time.Since(start)
 	dc := ""
 	ds := format_duration(d)
 	if d > time.Millisecond*100 {
@@ -38,11 +30,11 @@ func (o *outputter) FinishItem(r *Run, item Item, status itemStatus, err error) 
 
 	msg := fmt.Sprintf("%s%8s%s │ %-10s │ %-10s │ %s", dc, ds, reset(), typ, s, item.String())
 
-	if o.bar != nil {
-		o.bar.Println(msg)
-	} else {
-		fmt.Println(msg)
-	}
+	//	if o.bar != nil {
+	//		o.bar.Println(msg)
+	//	} else {
+	fmt.Println(msg)
+	//	}
 }
 
 func (o *outputter) Flush() {

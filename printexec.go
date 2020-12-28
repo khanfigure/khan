@@ -2,11 +2,10 @@ package khan
 
 import (
 	"context"
-	"fmt"
+	//	"fmt"
 	"io"
 	"os"
-
-	"github.com/keegancsmith/shell"
+	//	"github.com/keegancsmith/shell"
 )
 
 func printExec(host *Host, c string, args ...string) error {
@@ -17,11 +16,11 @@ func printExecStdin(host *Host, stdin io.Reader, c string, args ...string) error
 	r := host.Run
 
 	if r.Verbose {
-		fmt.Print(shell.ReadableEscapeArg(c))
-		for _, a := range args {
-			fmt.Print(" " + shell.ReadableEscapeArg(a))
-		}
-		fmt.Println()
+		//		fmt.Print(shell.ReadableEscapeArg(c))
+		//		for _, a := range args {
+		//			fmt.Print(" " + shell.ReadableEscapeArg(a))
+		//		}
+		//		fmt.Println()
 	}
 	if r.Dry {
 		return nil

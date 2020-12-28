@@ -30,12 +30,12 @@ func (host *Host) getInfo() error {
 	cmdline := "uname -a"
 
 	if host.Run.Verbose {
-		fmt.Println("ssh", host.Host, cmdline)
+		//fmt.Println("sshexec", host.Host, cmdline)
 	}
 
 	if err := session.Run(cmdline); err != nil {
 		if host.Run.Verbose {
-			fmt.Println("ssh", host.Host, cmdline, err)
+			//fmt.Println("sshexec", host.Host, cmdline, err)
 		}
 
 		return err

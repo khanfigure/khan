@@ -124,7 +124,7 @@ func Apply() error {
 			BannerCallback: ssh.BannerDisplayStderr(),
 		}
 
-		r.Pool = sshpool.New(sshconfig, &sshpool.PoolConfig{Debug: r.Verbose})
+		r.Pool = sshpool.New(sshconfig, &sshpool.PoolConfig{Debug: false}) //r.Verbose})
 	}
 
 	return r.run()

@@ -102,7 +102,7 @@ func (host *Host) Open(path string) (io.ReadCloser, error) {
 	cmdline := "cat " + shell.ReadableEscapeArg(path)
 
 	if host.Run.Verbose {
-		fmt.Println("ssh", host.Host, cmdline)
+		//fmt.Println("sshexec", host.Host, cmdline)
 	}
 
 	if err := session.Start(cmdline); err != nil {
@@ -113,12 +113,12 @@ func (host *Host) Open(path string) (io.ReadCloser, error) {
 	}
 
 	go func() {
-		//fmt.Println("ssh", host.Host, cmdline, "waiting for process finish")
+		//fmt.Println("sshexec", host.Host, cmdline, "waiting for process finish")
 		err := session.Wait()
 		if host.Run.Verbose {
-			fmt.Println("ssh", host.Host, cmdline, err)
+			//fmt.Println("sshexec", host.Host, cmdline, err)
 		}
-		//fmt.Println("ssh", host.Host, cmdline, "waiting for process finish done:", err)
+		//fmt.Println("sshexec", host.Host, cmdline, "waiting for process finish done:", err)
 		e := strings.TrimSpace(errbuf.String())
 
 		if err != nil {
@@ -140,9 +140,10 @@ func (host *Host) Open(path string) (io.ReadCloser, error) {
 		w.CloseWithError(err)
 
 		reader.procerr <- err
-		//fmt.Println("ssh", host.Host, cmdline, "error sent to reader")
+		//fmt.Println("sshexec", host.Host, cmdline, "error to reader:", err)
 		close(reader.procerr)
 		session.Put()
+		//fmt.Println("sshexec", host.Host, cmdline, "put()")
 	}()
 
 	return reader, nil
@@ -206,7 +207,7 @@ func (host *Host) Create(path string) (io.WriteCloser, error) {
 	cmdline := "cat > " + shell.ReadableEscapeArg(path)
 
 	if host.Run.Verbose {
-		fmt.Println("ssh", host.Host, cmdline)
+		//fmt.Println("sshexec", host.Host, cmdline)
 	}
 
 	if err := session.Start(cmdline); err != nil {
@@ -217,10 +218,10 @@ func (host *Host) Create(path string) (io.WriteCloser, error) {
 	}
 
 	go func() {
-		//fmt.Println("ssh", host.Host, cmdline, "waiting for process finish")
+		//fmt.Println("sshexec", host.Host, cmdline, "waiting for process finish")
 		err := session.Wait()
 		if host.Run.Verbose {
-			fmt.Println("ssh", host.Host, cmdline, err)
+			//fmt.Println("sshexec", host.Host, cmdline, err)
 		}
 		e := strings.TrimSpace(errbuf.String())
 
@@ -230,9 +231,9 @@ func (host *Host) Create(path string) (io.WriteCloser, error) {
 				cmdline, host.Host, err, e)
 		}
 
-		//fmt.Println("ssh", host.Host, cmdline, "waiting for process finish done:", err)
+		//fmt.Println("sshexec", host.Host, cmdline, "waiting for process finish done:", err)
 		writer.procerr <- err
-		//fmt.Println("ssh", host.Host, cmdline, "error sent to writer")
+		//fmt.Println("sshexec", host.Host, cmdline, "error sent to writer")
 		close(writer.procerr)
 
 		//r.CloseWithError(err)
@@ -262,12 +263,12 @@ func (host *Host) Remove(path string) error {
 	cmdline := "rm -f " + shell.ReadableEscapeArg(path)
 
 	if host.Run.Verbose {
-		fmt.Println("ssh", host.Host, cmdline)
+		//fmt.Println("sshexec", host.Host, cmdline)
 	}
 
 	if err := session.Run(cmdline); err != nil {
 		if host.Run.Verbose {
-			fmt.Println("ssh", host.Host, cmdline, err)
+			//fmt.Println("sshexec", host.Host, cmdline, err)
 		}
 
 		e := strings.TrimSpace(errbuf.String())

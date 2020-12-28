@@ -2,7 +2,7 @@ package khan
 
 import (
 	"context"
-	"fmt"
+	//	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -89,13 +89,13 @@ func (cmd *Cmd) Run() error {
 	}
 
 	if cmd.host.Run.Verbose {
-		fmt.Println("ssh", cmd.host.Host, cmdline, cmd.Env)
+		//fmt.Println("sshexec", cmd.host.Host, cmdline, cmd.Env)
 	}
 
 	err = session.Run(cmdline)
 
 	if cmd.host.Run.Verbose {
-		fmt.Println("ssh", cmd.host.Host, cmdline, err)
+		//fmt.Println("sshexec", cmd.host.Host, cmdline, err)
 	}
 
 	return err

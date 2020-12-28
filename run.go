@@ -6,6 +6,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/desops/sshpool"
 
@@ -227,12 +228,12 @@ func (r *Run) run() error {
 						mu.Unlock()
 					}
 
-					r.out.StartItem(r, item)
+					start := time.Now()
 					status, err := item.Apply(host)
 					if err != nil {
 						err = ex.im.WrapError(err)
 					}
-					r.out.FinishItem(r, item, status, err)
+					r.out.FinishItem(start, r, item, status, err)
 
 					return err
 				}()

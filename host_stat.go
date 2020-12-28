@@ -130,12 +130,12 @@ func (host *Host) Stat(path string) (os.FileInfo, error) {
 	cmdline := statcmd + " " + shell.ReadableEscapeArg(path)
 
 	if host.Run.Verbose {
-		fmt.Println("ssh", host.Host, cmdline)
+		//fmt.Println("sshexec", host.Host, cmdline)
 	}
 
 	if err := session.Run(cmdline); err != nil {
 		if host.Run.Verbose {
-			fmt.Println("ssh", host.Host, cmdline, err)
+			//fmt.Println("sshexec", host.Host, cmdline, err)
 		}
 
 		e := strings.TrimSpace(errbuf.String())
@@ -187,7 +187,7 @@ func (host *Host) Stat(path string) (os.FileInfo, error) {
 		}
 
 		if host.Run.Verbose {
-			fmt.Println(fi)
+			//fmt.Println(fi)
 		}
 
 		return fi, nil
@@ -223,7 +223,7 @@ func (host *Host) Stat(path string) (os.FileInfo, error) {
 	}
 
 	if host.Run.Verbose {
-		fmt.Println(fi)
+		//fmt.Println(fi)
 	}
 
 	return fi, nil

@@ -93,8 +93,15 @@ func (f *File) Apply(host *Host) (itemStatus, error) {
 		if err != nil && iserrnotfound(err) {
 			return itemUnchanged, nil
 		}
+		if err != nil {
+			// You know... I think this isn't safe and we should
+			// return the error. It's probably a permission error.
+			// I keep going back and forth on this.
+			return 0, err
+		}
+
 		if host.Run.Verbose && err != nil {
-			fmt.Fprintln(os.Stderr, "stat", f.Path, "error:", err)
+			//fmt.Fprintln(os.Stderr, "stat", f.Path, "error:", err)
 		}
 
 		status = itemDeleted

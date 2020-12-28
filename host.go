@@ -33,11 +33,7 @@ func (host *Host) String() string {
 	if host.Host == "" {
 		title += "(local mode)"
 	} else {
-		title += "(ssh"
-		if host.Host != host.Name {
-			title += " " + host.Host
-		}
-		title += ")"
+		title += fmt.Sprintf("(ssh %s@%s)", host.Run.User, host.Host)
 	}
 	return title
 }
