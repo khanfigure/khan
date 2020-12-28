@@ -15,7 +15,7 @@ import (
 )
 
 type sshReader struct {
-	host  *Host
+	host    *Host
 	session *ssh.Session
 	reader  *io.PipeReader
 
@@ -82,7 +82,7 @@ func (host *Host) Open(path string) (io.ReadCloser, error) {
 	}
 
 	reader := &sshReader{
-		host:  host,
+		host:    host,
 		procerr: make(chan error),
 	}
 
@@ -149,7 +149,7 @@ func (host *Host) Open(path string) (io.ReadCloser, error) {
 }
 
 type SSHWriter struct {
-	host  *Host
+	host    *Host
 	session *ssh.Session
 	writer  *io.PipeWriter
 
@@ -186,7 +186,7 @@ func (host *Host) Create(path string) (io.WriteCloser, error) {
 	}
 
 	writer := &SSHWriter{
-		host: host,
+		host:    host,
 		procerr: make(chan error),
 	}
 

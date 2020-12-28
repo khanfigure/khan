@@ -1,6 +1,5 @@
 package khan
 
-/*
 import (
 	"bufio"
 	"strconv"
@@ -8,20 +7,28 @@ import (
 )
 
 // Always lock userCacheMu before calling this
-func (r *Run) reloadUserGroupCache() error {
-	// already cached!
-	if r.groupCache != nil {
+func (host *Host) getUserGroups() error {
+	if err := host.getInfo(); err != nil {
+		return err
+	}
+
+	host.VirtMu.Lock()
+	defer host.VirtMu.Unlock()
+
+	v := host.Virt
+
+	if v.Users != nil {
+		// already cached!
 		return nil
 	}
 
-	r.groupCache = map[string]*Group{}
-	r.gidCache = map[int]*Group{}
-	r.userCache = map[string]*User{}
-	r.uidCache = map[int]*User{}
+	v.Users = map[string]*User{}
+	v.Groups = map[string]*Group{}
 
 	userGids := map[string]int{}
+	gids := map[int]string{}
 
-	u_rows, err := readColonFile(r, "/etc/passwd")
+	u_rows, err := readColonFile(host, "/etc/passwd")
 	if err != nil {
 		return err
 	}
@@ -53,16 +60,15 @@ func (r *Run) reloadUserGroupCache() error {
 		if u.Name[0] == '+' || u.Name[0] == '-' {
 			continue
 		}
-		r.userCache[u.Name] = &u
-		r.uidCache[u.Uid] = &u
+		v.Users[u.Name] = &u
 	}
 
-	sh_rows, err := readColonFile(r, "/etc/shadow")
-	if err != nil && iserrnotfound(err) {
-		// try openbsd mode!
-		r.bsdmode = true
-		sh_rows, err = readColonFile(r, "/etc/master.passwd")
+	shadowfile := "/etc/shadow"
+	if v.OS == "OpenBSD" {
+		shadowfile = "/etc/master.passwd"
 	}
+
+	sh_rows, err := readColonFile(host, shadowfile)
 	if err != nil {
 		return err
 	}
@@ -70,7 +76,7 @@ func (r *Run) reloadUserGroupCache() error {
 		if len(row) < 8 {
 			continue
 		}
-		u, ok := r.userCache[row[0]]
+		u, ok := v.Users[row[0]]
 		if !ok {
 			continue
 		}
@@ -87,7 +93,7 @@ func (r *Run) reloadUserGroupCache() error {
 		// TODO fancy /etc/shadow fields
 	}
 
-	g_rows, err := readColonFile(r, "/etc/group")
+	g_rows, err := readColonFile(host, "/etc/group")
 	if err != nil {
 		return err
 	}
@@ -109,11 +115,11 @@ func (r *Run) reloadUserGroupCache() error {
 		if g.Name[0] == '+' || g.Name[0] == '-' {
 			continue
 		}
-		r.groupCache[g.Name] = &g
-		r.gidCache[g.Gid] = &g
+		v.Groups[g.Name] = &g
+		gids[g.Gid] = g.Name
 		for _, u := range strings.Split(row[3], ",") {
 			u = strings.TrimSpace(u)
-			uu, ok := r.userCache[u]
+			uu, ok := v.Users[u]
 			if ok {
 				uu.Groups = append(uu.Groups, g.Name)
 			}
@@ -121,18 +127,18 @@ func (r *Run) reloadUserGroupCache() error {
 	}
 
 	for u, gid := range userGids {
-		user := r.userCache[u]
-		group := r.gidCache[gid]
-		if user != nil && group != nil {
-			user.Group = group.Name
+		user := v.Users[u]
+		group := gids[gid]
+		if user != nil && group != "" {
+			user.Group = group
 		}
 	}
 
 	return nil
 }
 
-func readColonFile(r *Run, path string) ([][]string, error) {
-	fh, err := r.rioconfig.Open(path)
+func readColonFile(host *Host, path string) ([][]string, error) {
+	fh, err := host.Open(path)
 	if err != nil {
 		return nil, err
 	}
@@ -157,4 +163,4 @@ func readColonFile(r *Run, path string) ([][]string, error) {
 		ret = append(ret, vals)
 	}
 	return ret, bs.Err()
-}*/
+}

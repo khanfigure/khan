@@ -57,7 +57,7 @@ func format_duration(d time.Duration) string {
 		d = d / (time.Millisecond * 100) * time.Millisecond * 100
 	} else if d > time.Millisecond {
 		d = d / time.Millisecond * time.Millisecond
-	} else {
+	} else if d > time.Microsecond {
 		d = d / time.Microsecond * time.Microsecond
 	}
 

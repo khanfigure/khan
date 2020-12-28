@@ -1,12 +1,12 @@
 package khan
 
 import (
-	"os"
-	"io"
-	"path/filepath"
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
+	"os"
+	"path/filepath"
 )
 
 type VaultResponse struct {
@@ -30,20 +30,20 @@ func (bdl *bindataloader) Get(path string) (io.Reader, error) {
 func setContextHostTools(pcontext map[string]interface{}, host *Host) {
 	kh := pcontext["khan"].(map[string]interface{})
 	kh["secret"] = func(path string) (map[string]string, error) {
-				buf := &bytes.Buffer{}
-				cmd := host.Command(context.Background(), "vault", "kv", "get", "-format", "json", "secret/"+path)
-				cmd.Shell = true
-				cmd.Stdout = buf
-				cmd.Stderr = os.Stderr
-				if err := cmd.Run(); err != nil {
-					return nil, err
-				}
-				var vr VaultResponse
-				if err := json.Unmarshal(buf.Bytes(), &vr); err != nil {
-					return nil, err
-				}
-				return vr.Data.Data, nil
-			}
+		buf := &bytes.Buffer{}
+		cmd := host.Command(context.Background(), "vault", "kv", "get", "-format", "json", "secret/"+path)
+		cmd.Shell = true
+		cmd.Stdout = buf
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			return nil, err
+		}
+		var vr VaultResponse
+		if err := json.Unmarshal(buf.Bytes(), &vr); err != nil {
+			return nil, err
+		}
+		return vr.Data.Data, nil
+	}
 }
 
 func executePackedTemplateFile(host *Host, tfile string) (string, error) {

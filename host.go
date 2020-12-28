@@ -19,8 +19,9 @@ type Host struct {
 	Host string // Host for SSH
 
 	VirtMu sync.RWMutex
-	Virt *Virtual // Virtual model of the host
+	Virt   *Virtual // Virtual model of the host
 }
+
 func (host *Host) Key() string {
 	if host.SSH {
 		return host.Host
@@ -34,7 +35,7 @@ func (host *Host) String() string {
 	} else {
 		title += "(ssh"
 		if host.Host != host.Name {
-			title += " "+host.Host
+			title += " " + host.Host
 		}
 		title += ")"
 	}

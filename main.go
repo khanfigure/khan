@@ -1,15 +1,15 @@
 package khan
 
 import (
-	"strings"
-	"sync"
 	"fmt"
 	"net"
 	"os"
+	"strings"
+	"sync"
 
-	"github.com/spf13/pflag"
 	"github.com/desops/sshpool"
 	"github.com/flosch/pongo2/v4"
+	"github.com/spf13/pflag"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
 )
@@ -19,7 +19,7 @@ var (
 	sourceprefix string
 
 	run *Run = &Run{
-		meta: map[int]*imeta{},
+		meta:   map[int]*imeta{},
 		fences: map[string]*sync.Mutex{},
 		errors: map[string]error{},
 	}
@@ -67,24 +67,24 @@ func Apply() error {
 		}
 		r.Hosts = append(r.Hosts, &Host{
 			Name: hostname,
-			SSH: false,
+			SSH:  false,
 			Virt: NewVirtual(),
-			Run: r,
+			Run:  r,
 		})
 	} else {
 		anyssh = true
 		for _, h := range hostlist {
-		name := h
-		if i := strings.IndexByte(name, ':'); i > -1 {
-			name = name[:i]
-		}
-		r.Hosts = append(r.Hosts, &Host{
-			Name: name,
-			SSH: true,
-			Host: h,
-			Virt: NewVirtual(),
-			Run: r,
-		})
+			name := h
+			if i := strings.IndexByte(name, ':'); i > -1 {
+				name = name[:i]
+			}
+			r.Hosts = append(r.Hosts, &Host{
+				Name: name,
+				SSH:  true,
+				Host: h,
+				Virt: NewVirtual(),
+				Run:  r,
+			})
 		}
 	}
 

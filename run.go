@@ -18,32 +18,32 @@ type Run struct {
 	Diff    bool
 	Verbose bool
 
-	Pool *sshpool.Pool
+	Pool  *sshpool.Pool
 	Hosts []*Host
-	User string
+	User  string
 
 	assetfn func(string) (io.ReadCloser, error)
 
 	out *outputter
 
-	pongomu sync.Mutex
+	pongomu            sync.Mutex
 	pongopackedset     *pongo2.TemplateSet
 	pongopackedcontext pongo2.Context
 	pongocachefiles    map[string]*pongo2.Template
 	pongocachestrings  map[string]*pongo2.Template
 
 	itemsmu   sync.Mutex
-	initdone bool
+	initdone  bool
 	inititems []*inititem // items added at init() time -- need more processing before they're valid
 	items     []Item
-	meta map[int]*imeta
+	meta      map[int]*imeta
 	nextid    int
-	fences map[string]*sync.Mutex
-	errors map[string]error
+	fences    map[string]*sync.Mutex
+	errors    map[string]error
 }
 
 type inititem struct {
-	item Item
+	item   Item
 	source string
 }
 
@@ -52,9 +52,9 @@ func (ii *inititem) WrapError(err error) error {
 }
 
 type imeta struct {
-	item Item
+	item   Item
 	source string
-	host *Host
+	host   *Host
 }
 
 func (im *imeta) WrapError(err error) error {
@@ -76,7 +76,7 @@ func (r *Run) AddFromSource(source string, add ...Item) error {
 	if !r.initdone {
 		for _, item := range add {
 			r.inititems = append(r.inititems, &inititem{
-				item: item,
+				item:   item,
 				source: source,
 			})
 		}
@@ -100,33 +100,33 @@ func (r *Run) AddFromSource(source string, add ...Item) error {
 
 // always have itemsmu locked before calling this
 func (r *Run) addHostItem(host *Host, source string, item Item) error {
-		if item.ID() != 0 {
-			return fmt.Errorf("Item cannot be added twice: %v", item)
+	if item.ID() != 0 {
+		return fmt.Errorf("Item cannot be added twice: %v", item)
+	}
+
+	r.nextid++
+	id := r.nextid
+
+	item.SetID(id)
+
+	im := &imeta{
+		source: source,
+		host:   host,
+		item:   item,
+	}
+
+	r.meta[id] = im
+	r.items = append(r.items, item)
+
+	// create fences for things item provides
+	for _, p := range item.Provides() {
+		p = host.Key() + "-" + p
+		if _, ok := r.fences[p]; ok {
+			return im.WrapError(fmt.Errorf("Duplicate provider of %#v", p))
 		}
-
-		r.nextid++
-		id := r.nextid
-
-		item.SetID(id)
-
-		im := &imeta{
-			source: source,
-			host: host,
-			item: item,
-		}
-
-		r.meta[id] = im
-		r.items = append(r.items, item)
-
-		// create fences for things item provides
-		for _, p := range item.Provides() {
-			p = host.Key()+"-"+p
-			if _, ok := r.fences[p]; ok {
-				return im.WrapError(fmt.Errorf("Duplicate provider of %#v", p))
-			}
-			r.fences[p] = &sync.Mutex{}
-			r.fences[p].Lock()
-		}
+		r.fences[p] = &sync.Mutex{}
+		r.fences[p].Lock()
+	}
 
 	return nil
 }
@@ -168,47 +168,47 @@ func (r *Run) run() error {
 
 	type iexec struct {
 		item Item
-		im *imeta
+		im   *imeta
 	}
 
 	var (
-		exec []*iexec
-		running int
+		exec     []*iexec
+		running  int
 		firsterr error
 		executed = map[int]bool{}
 	)
 
 	for {
 
-	r.itemsmu.Lock()
-	for _, item := range r.items {
-		if executed[item.ID()] {
-			continue
+		r.itemsmu.Lock()
+		for _, item := range r.items {
+			if executed[item.ID()] {
+				continue
+			}
+			executed[item.ID()] = true
+			exec = append(exec, &iexec{
+				item: item,
+				im:   r.meta[item.ID()],
+			})
 		}
-		executed[item.ID()] = true
-		exec = append(exec, &iexec{
-			item: item,
-			im: r.meta[item.ID()],
-		})
-	}
-	r.itemsmu.Unlock()
+		r.itemsmu.Unlock()
 
-	for _, ex := range exec {
-		running++
-		go func(ex *iexec) {
-			item := ex.item
-			host := ex.im.host
+		for _, ex := range exec {
+			running++
+			go func(ex *iexec) {
+				item := ex.item
+				host := ex.im.host
 
 				err := func() error {
 					// be a little tricky here to allow fences to appear in the future
 					for {
 						var (
-							mu      *sync.Mutex
+							mu *sync.Mutex
 							//waiting string
 						)
 						r.itemsmu.Lock()
 						for _, n := range item.Needs() {
-							n = host.Key()+"-"+n
+							n = host.Key() + "-" + n
 							m, ok := r.fences[n]
 							if ok {
 								mu = m
@@ -239,7 +239,7 @@ func (r *Run) run() error {
 
 				r.itemsmu.Lock()
 				for _, p := range item.Provides() {
-					p = host.Key()+"-"+p
+					p = host.Key() + "-" + p
 					r.errors[p] = err
 					mu, ok := r.fences[p]
 					if ok {
@@ -249,23 +249,23 @@ func (r *Run) run() error {
 				}
 				r.itemsmu.Unlock()
 
-				errs<-err
-		}(ex)
-	}
+				errs <- err
+			}(ex)
+		}
 
-	exec = nil
+		exec = nil
 
-	if running == 0 {
-		return firsterr
-	}
+		if running == 0 {
+			return firsterr
+		}
 
-	// wait for something to finish
-	err := <-errs
-	running--
+		// wait for something to finish
+		err := <-errs
+		running--
 
-	if err != nil && firsterr == nil {
-		firsterr = err
-	}
+		if err != nil && firsterr == nil {
+			firsterr = err
+		}
 
 	}
 }

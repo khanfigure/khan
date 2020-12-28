@@ -13,27 +13,25 @@ import (
 // kept in memory in their entirety.)
 type Virtual struct {
 	// Host metadata extracted from uname command
-	Uname string
+	Uname    string
 	Hostname string
-	Kernel string
-	OS string
-	Arch string
+	Kernel   string
+	OS       string
+	Arch     string
 
 	// File system model
-	Files map[string]os.FileInfo
+	Files    map[string]os.FileInfo
 	Contents map[string]string
 
 	// User and group model
-	Users map[string]User
-	Groups map[string]Group
+	Users  map[string]*User
+	Groups map[string]*Group
 }
 
 func NewVirtual() *Virtual {
 	v := &Virtual{
-		Files: make(map[string]os.FileInfo),
+		Files:    make(map[string]os.FileInfo),
 		Contents: make(map[string]string),
-		Users: make(map[string]User),
-		Groups: make(map[string]Group),
 	}
 	return v
 }
