@@ -53,7 +53,7 @@ func Apply() error {
 	localmode := false
 	pflag.BoolVarP(&localmode, "local", "l", false, "Run without SSH against local host as current user")
 
-	pflag.StringVarP(&r.User, "user", "u", "root", "SSH User")
+	pflag.StringVarP(&r.User, "user", "u", os.Getenv("USER"), "SSH User")
 
 	var hostlist []string
 	pflag.StringSliceVarP(&hostlist, "host", "h", nil, "SSH Host (may be host:port, may be repeated)")
