@@ -20,18 +20,24 @@ type Virtual struct {
 	Arch     string
 
 	// File system model
-	Files    map[string]os.FileInfo
-	Contents map[string]string
+	Files   map[string]os.FileInfo
+	Content map[string]string
 
 	// User and group model
 	Users  map[string]*User
 	Groups map[string]*Group
+
+	cacheUsers  map[string]*User
+	cacheGroups map[string]*Group
+	withshadow  bool
 }
 
 func NewVirtual() *Virtual {
 	v := &Virtual{
-		Files:    make(map[string]os.FileInfo),
-		Contents: make(map[string]string),
+		Files:   make(map[string]os.FileInfo),
+		Content: make(map[string]string),
+		Users:   make(map[string]*User),
+		Groups:  make(map[string]*Group),
 	}
 	return v
 }

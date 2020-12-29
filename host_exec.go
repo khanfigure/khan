@@ -1,11 +1,13 @@
 package khan
 
 import (
+	"bytes"
 	"context"
-	//	"fmt"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/keegancsmith/shell"
 )
@@ -27,6 +29,20 @@ type Cmd struct {
 	host *Host
 }
 
+type CmdErr struct {
+	Cmd     *Cmd
+	StdErr  string
+	ExecErr error
+}
+
+func (c CmdErr) Error() string {
+	r := c.ExecErr.Error()
+	if len(c.StdErr) > 0 {
+		r += ": " + c.StdErr
+	}
+	return r
+}
+
 func (host *Host) Command(ctx context.Context, path string, args ...string) *Cmd {
 	return &Cmd{
 		Path: path,
@@ -39,6 +55,12 @@ func (host *Host) Command(ctx context.Context, path string, args ...string) *Cmd
 }
 
 func (cmd *Cmd) Run() error {
+	errbuf := &bytes.Buffer{}
+
+	if cmd.Stderr == nil {
+		cmd.Stderr = errbuf
+	}
+
 	if !cmd.host.SSH {
 		c := exec.CommandContext(cmd.Context, cmd.Path, cmd.Args...)
 		c.Stdin = cmd.Stdin
@@ -51,7 +73,10 @@ func (cmd *Cmd) Run() error {
 				c.Env = append(c.Env, e[0]+"="+e[1])
 			}
 		}
-		return c.Run()
+		if err := c.Run(); err != nil {
+			return &CmdErr{Cmd: cmd, StdErr: strings.TrimSpace(errbuf.String()), ExecErr: err}
+		}
+		return nil
 	}
 
 	session, err := cmd.host.Run.Pool.Get(cmd.host.Host)
@@ -89,14 +114,17 @@ func (cmd *Cmd) Run() error {
 	}
 
 	if cmd.host.Run.Verbose {
-		//fmt.Println("sshexec", cmd.host.Host, cmdline, cmd.Env)
+		fmt.Println("sshexec", cmd.host.Host, cmdline, cmd.Env)
 	}
 
 	err = session.Run(cmdline)
 
 	if cmd.host.Run.Verbose {
-		//fmt.Println("sshexec", cmd.host.Host, cmdline, err)
+		fmt.Println("sshexec", cmd.host.Host, cmdline, err)
 	}
 
-	return err
+	if err != nil {
+		return &CmdErr{Cmd: cmd, StdErr: strings.TrimSpace(errbuf.String()), ExecErr: err}
+	}
+	return nil
 }

@@ -1,8 +1,10 @@
 package khan
 
 import (
+	"errors"
 	"fmt"
 	"io"
+	"os"
 	"runtime"
 	"strings"
 	"sync"
@@ -11,6 +13,10 @@ import (
 	"github.com/desops/sshpool"
 
 	"github.com/flosch/pongo2/v4"
+)
+
+var (
+	errNeededItemFailed = errors.New("Needed item failed")
 )
 
 // Run is the context for an execution run, on one or more servers.
@@ -44,6 +50,7 @@ type Run struct {
 	meta      map[int]*imeta
 	nextid    int
 	fences    map[string]*sync.Mutex
+	befores   map[string][]string
 	errors    map[string]error
 }
 
@@ -132,6 +139,11 @@ func (r *Run) addHostItem(host *Host, source string, item Item) error {
 		}
 		r.fences[p] = &sync.Mutex{}
 		r.fences[p].Lock()
+
+		for _, bef := range item.Before() {
+			bef = host.Key() + "-" + bef
+			r.befores[bef] = append(r.befores[bef], p)
+		}
 	}
 
 	return nil
@@ -180,8 +192,11 @@ func (r *Run) run() error {
 	var (
 		exec     []*iexec
 		running  int
-		firsterr error
 		executed = map[int]bool{}
+
+		errors             int
+		interesting_errors []error
+		skipfailures       int
 	)
 
 	for {
@@ -209,16 +224,24 @@ func (r *Run) run() error {
 					// be a little tricky here to allow fences to appear in the future
 					for {
 						var (
-							mu *sync.Mutex
-							//waiting string
+							mu      *sync.Mutex
+							waiting string
 						)
 						r.itemsmu.Lock()
-						for _, n := range item.Needs() {
-							n = host.Key() + "-" + n
+						waitlist := make([]string, 0, len(item.After()))
+						for _, after := range item.After() {
+							waitlist = append(waitlist, host.Key()+"-"+after)
+						}
+						for _, pr := range item.Provides() {
+							for _, bef := range r.befores[host.Key()+"-"+pr] {
+								waitlist = append(waitlist, bef)
+							}
+						}
+						for _, n := range waitlist {
 							m, ok := r.fences[n]
 							if ok {
 								mu = m
-								//waiting = n
+								waiting = n
 								break
 							}
 						}
@@ -229,8 +252,22 @@ func (r *Run) run() error {
 						}
 
 						//fmt.Println(item, "awaiting", waiting)
+
 						mu.Lock()
 						mu.Unlock()
+
+						// if a task we need fails, we need to fail too.
+						r.itemsmu.Lock()
+						parenterr, ok := r.errors[waiting]
+						r.itemsmu.Unlock()
+
+						if !ok {
+							// WTF, this should never happen
+							return fmt.Errorf("Parent task error status not found")
+						}
+						if parenterr != nil {
+							return errNeededItemFailed
+						}
 					}
 
 					start := time.Now()
@@ -262,16 +299,33 @@ func (r *Run) run() error {
 		exec = nil
 
 		if running == 0 {
-			return firsterr
+			if r.Dry {
+				fmt.Fprintln(os.Stderr, "No actions actually performed (dry run)")
+			}
+			if errors == 0 && skipfailures == 0 {
+				fmt.Fprintln(os.Stderr, "✓ Great success!")
+				return nil
+			}
+			fmt.Fprintf(os.Stderr, "%s─── %d failures ───%s\n", color(Red), errors, reset())
+			for _, err := range interesting_errors {
+				fmt.Fprintln(os.Stderr, err)
+			}
+			return fmt.Errorf("%d items failed (%d items skipped)", errors, skipfailures)
 		}
 
 		// wait for something to finish
 		err := <-errs
 		running--
 
-		if err != nil && firsterr == nil {
-			firsterr = err
+		if err != nil {
+			if err == errNeededItemFailed {
+				skipfailures++
+			} else {
+				interesting_errors = append(interesting_errors, err)
+				errors++
+			}
+		} else {
+			// success!
 		}
-
 	}
 }

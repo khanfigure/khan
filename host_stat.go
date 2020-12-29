@@ -15,8 +15,10 @@ import (
 
 const (
 	// Found these in OpenBSD's source for the stat command :)
-	s_ifmt  = 0170000
-	s_ifdir = 0040000
+	s_ifmt     = 0170000 // type of file mask
+	s_ifdir    = 0040000 // directory
+	s_ifreg    = 0100000 // regular
+	s_justmode = 0777    // this is me ignoring things like suid for now
 )
 
 type FileInfo struct {
@@ -26,8 +28,8 @@ type FileInfo struct {
 	modtime time.Time
 	isdir   bool
 
-	uid int
-	gid int
+	uid uint32
+	gid uint32
 }
 
 func (fi *FileInfo) Name() string {
@@ -46,7 +48,13 @@ func (fi *FileInfo) IsDir() bool {
 	return fi.isdir
 }
 func (fi *FileInfo) Sys() interface{} {
-	return nil
+	return fi
+}
+func (fi *FileInfo) Uid() uint32 {
+	return fi.uid
+}
+func (fi *FileInfo) Gid() uint32 {
+	return fi.gid
 }
 
 func (fi *FileInfo) String() string {
@@ -91,9 +99,6 @@ var linuxStatRe = regexp.MustCompile(`^(.*) (\d+) \d+ ([a-fA-F0-9]+) (\d+) (\d+)
 // /tmp/file_duck 9 8 81a4 1000 1000 2d 20963 1 0 0 1608356438 1608356438 1608356438 0 4096
 
 func (host *Host) Stat(path string) (os.FileInfo, error) {
-	if !host.SSH {
-		return os.Stat(path)
-	}
 
 	// need this to know what args to pass to stat command
 	err := host.getInfo()
@@ -106,8 +111,16 @@ func (host *Host) Stat(path string) (os.FileInfo, error) {
 	cachevirt, hit := host.Virt.Files[path]
 	host.VirtMu.RUnlock()
 
-	if hit {
+	if hit && host.Run.Dry {
+		if cachevirt == nil {
+			// file is "gone", return emulated notfound error
+			return nil, &os.PathError{Path: path, Err: syscall.ENOENT}
+		}
 		return cachevirt, nil
+	}
+
+	if !host.SSH {
+		return os.Stat(path)
 	}
 
 	session, err := host.Run.Pool.Get(host.Host)
@@ -130,12 +143,12 @@ func (host *Host) Stat(path string) (os.FileInfo, error) {
 	cmdline := statcmd + " " + shell.ReadableEscapeArg(path)
 
 	if host.Run.Verbose {
-		//fmt.Println("sshexec", host.Host, cmdline)
+		fmt.Println("sshexec", host.Host, cmdline)
 	}
 
 	if err := session.Run(cmdline); err != nil {
 		if host.Run.Verbose {
-			//fmt.Println("sshexec", host.Host, cmdline, err)
+			fmt.Println("sshexec", host.Host, cmdline, err)
 		}
 
 		e := strings.TrimSpace(errbuf.String())
@@ -169,13 +182,17 @@ func (host *Host) Stat(path string) (os.FileInfo, error) {
 		if err != nil {
 			return nil, err
 		}
-		fi.mode = os.FileMode(mode) // convert to uint32
-		if fi.uid, err = strconv.Atoi(match[2]); err != nil {
+		fi.mode = os.FileMode(mode)
+		uid, err := strconv.ParseUint(match[2], 10, 32)
+		if err != nil {
 			return nil, err
 		}
-		if fi.gid, err = strconv.Atoi(match[2]); err != nil {
+		fi.uid = uint32(uid)
+		gid, err := strconv.ParseUint(match[3], 10, 32)
+		if err != nil {
 			return nil, err
 		}
+		fi.gid = uint32(gid)
 		mtime, err := strconv.ParseInt(match[5], 10, 64)
 		if err != nil {
 			return nil, err
@@ -205,13 +222,17 @@ func (host *Host) Stat(path string) (os.FileInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	fi.mode = os.FileMode(mode) // convert to uint32
-	if fi.uid, err = strconv.Atoi(match[4]); err != nil {
+	fi.mode = os.FileMode(mode)
+	uid, err := strconv.ParseUint(match[4], 10, 32)
+	if err != nil {
 		return nil, err
 	}
-	if fi.gid, err = strconv.Atoi(match[5]); err != nil {
+	fi.uid = uint32(uid)
+	gid, err := strconv.ParseUint(match[5], 10, 32)
+	if err != nil {
 		return nil, err
 	}
+	fi.gid = uint32(gid)
 	mtime, err := strconv.ParseInt(match[6], 10, 64)
 	if err != nil {
 		return nil, err

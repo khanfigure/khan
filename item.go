@@ -44,7 +44,8 @@ type Item interface {
 	Apply(host *Host) (itemStatus, error)
 
 	Provides() []string
-	Needs() []string
+	After() []string
+	Before() []string
 }
 
 type Validator interface {

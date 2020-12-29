@@ -7,7 +7,7 @@ import (
 )
 
 // Always lock userCacheMu before calling this
-func (host *Host) getUserGroups() error {
+func (host *Host) getUserGroups(withshadow bool) error {
 	if err := host.getInfo(); err != nil {
 		return err
 	}
@@ -17,16 +17,16 @@ func (host *Host) getUserGroups() error {
 
 	v := host.Virt
 
-	if v.Users != nil {
+	if v.cacheUsers != nil && (v.withshadow || !withshadow) {
 		// already cached!
 		return nil
 	}
 
-	v.Users = map[string]*User{}
-	v.Groups = map[string]*Group{}
+	v.cacheUsers = map[string]*User{}
+	v.cacheGroups = map[string]*Group{}
 
-	userGids := map[string]int{}
-	gids := map[int]string{}
+	userGids := map[string]uint32{}
+	gids := map[uint32]string{}
 
 	u_rows, err := readColonFile(host, "/etc/passwd")
 	if err != nil {
@@ -36,20 +36,20 @@ func (host *Host) getUserGroups() error {
 		if len(row) < 6 {
 			continue
 		}
-		uid, err := strconv.Atoi(row[2])
+		uid, err := strconv.ParseUint(row[2], 10, 32)
 		if err != nil {
 			continue
 		}
-		gid, err := strconv.Atoi(row[3])
+		gid, err := strconv.ParseUint(row[3], 10, 32)
 		if err != nil {
 			continue
 		}
 
-		userGids[row[0]] = gid
+		userGids[row[0]] = uint32(gid)
 
 		u := User{
 			Name:  row[0],
-			Uid:   uid,
+			Uid:   uint32(uid),
 			Gecos: row[4],
 			Home:  row[5],
 			Shell: row[6],
@@ -60,37 +60,39 @@ func (host *Host) getUserGroups() error {
 		if u.Name[0] == '+' || u.Name[0] == '-' {
 			continue
 		}
-		v.Users[u.Name] = &u
+		v.cacheUsers[u.Name] = &u
 	}
 
-	shadowfile := "/etc/shadow"
-	if v.OS == "OpenBSD" {
-		shadowfile = "/etc/master.passwd"
-	}
-
-	sh_rows, err := readColonFile(host, shadowfile)
-	if err != nil {
-		return err
-	}
-	for _, row := range sh_rows {
-		if len(row) < 8 {
-			continue
-		}
-		u, ok := v.Users[row[0]]
-		if !ok {
-			continue
+	if withshadow {
+		shadowfile := "/etc/shadow"
+		if v.OS == "OpenBSD" {
+			shadowfile = "/etc/master.passwd"
 		}
 
-		if row[1] == "" {
-			u.BlankPassword = true
-		} else if row[1] == "!" || row[1] == "!!" || row[1] == "x" {
-			// This is represented by:
-			//    BlankPassword = false
-			//    Password = ""
-		} else {
-			u.Password = row[1]
+		sh_rows, err := readColonFile(host, shadowfile)
+		if err != nil {
+			return err
 		}
-		// TODO fancy /etc/shadow fields
+		for _, row := range sh_rows {
+			if len(row) < 8 {
+				continue
+			}
+			u, ok := v.cacheUsers[row[0]]
+			if !ok {
+				continue
+			}
+
+			if row[1] == "" {
+				u.BlankPassword = true
+			} else if row[1] == "!" || row[1] == "!!" || row[1] == "x" {
+				// This is represented by:
+				//    BlankPassword = false
+				//    Password = ""
+			} else {
+				u.Password = row[1]
+			}
+			// TODO fancy /etc/shadow fields
+		}
 	}
 
 	g_rows, err := readColonFile(host, "/etc/group")
@@ -101,13 +103,13 @@ func (host *Host) getUserGroups() error {
 		if len(row) < 4 {
 			continue
 		}
-		id, err := strconv.Atoi(row[2])
+		id, err := strconv.ParseUint(row[2], 10, 32)
 		if err != nil {
 			continue
 		}
 		g := Group{
 			Name: row[0],
-			Gid:  id,
+			Gid:  uint32(id),
 		}
 		if len(g.Name) == 0 {
 			continue
@@ -115,11 +117,11 @@ func (host *Host) getUserGroups() error {
 		if g.Name[0] == '+' || g.Name[0] == '-' {
 			continue
 		}
-		v.Groups[g.Name] = &g
+		v.cacheGroups[g.Name] = &g
 		gids[g.Gid] = g.Name
 		for _, u := range strings.Split(row[3], ",") {
 			u = strings.TrimSpace(u)
-			uu, ok := v.Users[u]
+			uu, ok := v.cacheUsers[u]
 			if ok {
 				uu.Groups = append(uu.Groups, g.Name)
 			}
@@ -127,7 +129,7 @@ func (host *Host) getUserGroups() error {
 	}
 
 	for u, gid := range userGids {
-		user := v.Users[u]
+		user := v.cacheUsers[u]
 		group := gids[gid]
 		if user != nil && group != "" {
 			user.Group = group

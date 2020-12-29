@@ -449,9 +449,18 @@ func yaml2value(w *yamlwalker, v *yaml.Node, kind yaml.Kind, value string, dest 
 		}
 		vi, err := strconv.Atoi(value)
 		if err != nil {
-			return w.nodeErrorf(v, "Conversion to integer failed: %w", err)
+			return w.nodeErrorf(v, "Conversion to int failed: %w", err)
 		}
 		dest.SetInt(int64(vi))
+	case reflect.Uint32:
+		if kind != yaml.ScalarNode {
+			return w.nodeErrorf(v, "Expected scaler convertable to %s: Got %s", typ.Kind(), yamlkind(kind))
+		}
+		vi, err := strconv.ParseUint(value, 10, 32)
+		if err != nil {
+			return w.nodeErrorf(v, "Conversion to uint32 failed: %w", err)
+		}
+		dest.SetUint(vi)
 	case reflect.Bool:
 		if kind != yaml.ScalarNode {
 			return w.nodeErrorf(v, "Expected scaler convertable to %s: Got %s", typ.Kind(), yamlkind(kind))

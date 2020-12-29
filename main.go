@@ -16,9 +16,10 @@ import (
 
 var (
 	defaultrun *Run = &Run{
-		meta:   map[int]*imeta{},
-		fences: map[string]*sync.Mutex{},
-		errors: map[string]error{},
+		meta:    map[int]*imeta{},
+		fences:  map[string]*sync.Mutex{},
+		befores: map[string][]string{},
+		errors:  map[string]error{},
 	}
 )
 

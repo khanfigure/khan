@@ -28,7 +28,9 @@ func printExecStdin(host *Host, stdin io.Reader, c string, args ...string) error
 	cmd := host.Command(context.Background(), c, args...)
 	cmd.Stdin = stdin
 	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+
+	// leave unset so stderr gets wrapped into any returned errors
+	//cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
 		return err
 	}

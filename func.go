@@ -44,7 +44,10 @@ func (f *Function) StaticFiles() []string {
 	return nil
 }
 
-func (f *Function) Needs() []string {
+func (f *Function) After() []string {
+	return nil
+}
+func (f *Function) Before() []string {
 	return nil
 }
 func (f *Function) Provides() []string {

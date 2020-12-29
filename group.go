@@ -7,7 +7,7 @@ import (
 
 type Group struct {
 	Name string
-	Gid  int
+	Gid  uint32
 
 	Delete bool
 
@@ -29,15 +29,22 @@ func (g *Group) Clone() Item {
 	r.id = 0
 	return &r
 }
-func (g *Group) Needs() []string {
+func (g *Group) After() []string {
+	return nil
+}
+func (g *Group) Before() []string {
 	return nil
 }
 func (g *Group) Provides() []string {
-	return nil
+	if g.Delete {
+		return []string{"-group:" + g.Name}
+	} else {
+		return []string{"group:" + g.Name}
+	}
 }
 
 func (g *Group) Apply(host *Host) (itemStatus, error) {
-	if err := host.getUserGroups(); err != nil {
+	if err := host.getUserGroups(true); err != nil {
 		return 0, err
 	}
 
@@ -46,29 +53,37 @@ func (g *Group) Apply(host *Host) (itemStatus, error) {
 
 	v := host.Virt
 
-	old := v.Groups[g.Name]
+	old := v.cacheGroups[g.Name]
+	if host.Run.Dry {
+		cachedold, hit := v.Groups[g.Name]
+		if hit {
+			old = cachedold
+		}
+	}
 
 	if g.Delete {
 		if old == nil {
 			return itemUnchanged, nil
 		}
-		if err := printExec(host, "groupdel", old.Name); err != nil {
+		if err := printExec(host, "groupdel", g.Name); err != nil {
 			return 0, err
 		}
-		delete(v.Groups, old.Name)
+		v.Groups[g.Name] = nil // not deleted on purpose: tombstone
+		delete(v.cacheGroups, old.Name)
 		return itemDeleted, nil
 	}
 
 	if old == nil {
 		//fmt.Printf("+ group %s (gid %d)\n", g.Name, g.Gid)
-		if err := printExec(host, "groupadd", "-g", strconv.Itoa(g.Gid), g.Name); err != nil {
+		if err := printExec(host, "groupadd", "-g", strconv.FormatUint(uint64(g.Gid), 10), g.Name); err != nil {
 			return 0, err
 		}
-		newgrp := Group{
+		old = &Group{
 			Name: g.Name,
 			Gid:  g.Gid,
 		}
-		v.Groups[g.Name] = &newgrp
+		v.Groups[g.Name] = old
+		v.cacheGroups[g.Name] = old
 		return itemCreated, nil
 	}
 
@@ -77,10 +92,10 @@ func (g *Group) Apply(host *Host) (itemStatus, error) {
 	if old.Gid != g.Gid {
 		modified = true
 		//fmt.Printf("~ group %s (gid %d → %d)\n", g.Name, old.Gid, g.Gid)
-		if err := printExec(host, "groupmod", "-g", strconv.Itoa(g.Gid), g.Name); err != nil {
+		if err := printExec(host, "groupmod", "-g", strconv.FormatUint(uint64(g.Gid), 10), g.Name); err != nil {
 			return 0, err
 		}
-		v.Groups[g.Name].Gid = g.Gid
+		old.Gid = g.Gid
 	}
 
 	if modified {
