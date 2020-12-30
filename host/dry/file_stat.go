@@ -3,6 +3,7 @@ package dry
 import (
 	"fmt"
 	"os"
+	"syscall"
 	"time"
 )
 
@@ -42,6 +43,23 @@ func (fi *FileInfo) Gid() uint32 {
 	return fi.gid
 }
 func (fi *FileInfo) String() string {
-	return fmt.Sprintf("file %#v size %d mode %o mtime %v isdir %v uid %d gid %d",
-		fi.name, fi.size, fi.mode, fi.modtime, fi.isdir, fi.uid, fi.gid)
+	return fmt.Sprintf("%T file %#v size %d mode %o mtime %v isdir %v uid %d gid %d",
+		fi, fi.name, fi.size, fi.mode, fi.modtime, fi.isdir, fi.uid, fi.gid)
+}
+
+func (host *Host) Stat(fpath string) (os.FileInfo, error) {
+	host.fsmu.Lock()
+	file := host.fs[fpath]
+	if file == nil && host.cascade != nil {
+		// we don't want to hold this lock while SSH does its thing
+		host.fsmu.Unlock()
+		return host.cascade.Stat(fpath)
+	}
+	defer host.fsmu.Unlock()
+
+	if file == nil || file.info == nil {
+		return nil, &os.PathError{Op: "stat", Path: fpath, Err: syscall.ENOENT}
+	}
+
+	return file.info, nil
 }

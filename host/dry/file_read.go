@@ -25,24 +25,21 @@ func (r *Reader) Close() error {
 
 func (host *Host) Open(fpath string) (io.ReadCloser, error) {
 	host.fsmu.Lock()
-	defer host.fsmu.Unlock()
-
 	file := host.fs[fpath]
-
 	if file == nil && host.cascade != nil {
+		// we don't want to hold this lock while SSH does its thing
+		host.fsmu.Unlock()
 		return host.cascade.Open(fpath)
 	}
+	defer host.fsmu.Unlock()
 
-	if file == nil {
+	if file == nil || file.info == nil {
 		return nil, &os.PathError{Op: "open", Path: fpath, Err: syscall.ENOENT}
 	}
 
-	if file != nil && file.info != nil {
-		// TODO: Someday, be super cool and emulate a bunch of common permission errors.
-
-		if file.info.isdir {
-			return nil, &os.PathError{Op: "open", Path: fpath, Err: syscall.EISDIR}
-		}
+	// TODO: Someday, be super cool and emulate a bunch of common permission errors.
+	if file.info.isdir {
+		return nil, &os.PathError{Op: "open", Path: fpath, Err: syscall.EISDIR}
 	}
 
 	reader := &Reader{
