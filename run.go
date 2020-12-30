@@ -27,7 +27,6 @@ type Run struct {
 
 	Pool  *sshpool.Pool
 	Hosts []*Host
-	User  string
 
 	assetfn func(string) (io.ReadCloser, error)
 
