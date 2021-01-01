@@ -1,5 +1,15 @@
 package util
 
+import (
+	"fmt"
+	"os"
+	"regexp"
+	"strconv"
+	"strings"
+	"syscall"
+	"time"
+)
+
 // Tools for emulating stat results (os.FileInfo implementation) and
 // for parsing the output of the stat command on various operating systems
 
@@ -102,13 +112,14 @@ func ParseStat(osname, fpath, stdout, stderr string, execerr error) (*FileInfo, 
 		return nil, execerr
 	}
 
+	var err error
 	fi := &FileInfo{}
 
 	switch osname {
-	case "OpenBSD":
+	case "openbsd":
 		match := openbsdStatRe.FindStringSubmatch(stdout)
 		if match == nil {
-			return nil, fmt.Errorf("Cannot parse OS %#v stat output: %#v", osname, outstr)
+			return nil, fmt.Errorf("Cannot parse OS %#v stat output: %#v", osname, stdout)
 		}
 		fi.Fname = match[6]
 		if fi.Fsize, err = strconv.ParseInt(match[4], 10, 64); err != nil {
@@ -140,10 +151,10 @@ func ParseStat(osname, fpath, stdout, stderr string, execerr error) (*FileInfo, 
 		}
 		return fi, nil
 
-	case "Linux":
-		match := linuxStatRe.FindStringSubmatch(outstr)
+	case "linux":
+		match := linuxStatRe.FindStringSubmatch(stdout)
 		if match == nil {
-			return nil, fmt.Errorf("Cannot parse OS %#v stat output: %#v", osname, outstr)
+			return nil, fmt.Errorf("Cannot parse OS %#v stat output: %#v", osname, stdout)
 		}
 		fi.Fname = match[1]
 		if fi.Fsize, err = strconv.ParseInt(match[2], 10, 64); err != nil {

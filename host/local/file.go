@@ -21,3 +21,7 @@ func (host *Host) Open(fpath string) (io.ReadCloser, error) {
 func (host *Host) ReadFile(fpath string) ([]byte, error) {
 	return ioutil.ReadFile(fpath)
 }
+
+func (host *Host) Stat(fpath string) (os.FileInfo, error) {
+	return os.Stat(fpath)
+}

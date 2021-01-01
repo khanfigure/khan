@@ -2,6 +2,7 @@ package dry
 
 import (
 	"fmt"
+	"runtime"
 	"sync"
 
 	hhost "github.com/desops/khan/host"
@@ -37,5 +38,9 @@ func (host *Host) Info() (*hhost.Info, error) {
 	}
 
 	// TODO let you customize this
-	return &hhost.Info{}, nil
+	return &hhost.Info{
+		Hostname: "dry",
+		OS:       runtime.GOOS,
+		Arch:     runtime.GOARCH,
+	}, nil
 }

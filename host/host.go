@@ -1,6 +1,7 @@
 package host
 
 import (
+	"fmt"
 	"io"
 	"os"
 )
@@ -19,10 +20,13 @@ type Host interface {
 }
 
 type Info struct {
-	// Host metadata usually extracted from uname command
 	Uname    string
 	Hostname string
 	Kernel   string
 	OS       string
 	Arch     string
+}
+
+func (info *Info) String() string {
+	return fmt.Sprintf("%s (%s/%s)", info.Hostname, info.OS, info.Arch)
 }

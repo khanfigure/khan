@@ -46,15 +46,23 @@ func run() error {
 
 	var hosts []host.Host
 
-	sugo := remote.New(pool, "root@sugo:1722")
+	_ = local.Host{}
+
+	//sugo := remote.New(pool, "root@sugo:1722")
+	surfeit := remote.New(pool, "joel@localhost")
 
 	hosts = append(hosts, local.New())
 	//	hosts = append(hosts, remote.New(pool, "joel.jensen@stan"))
 	//	hosts = append(hosts, sugo)
-	hosts = append(hosts, dry.New(0, 0, sugo))
+	hosts = append(hosts, dry.New(0, 0, surfeit))
 
 	for _, host := range hosts {
 		fmt.Println("doing host", host)
+		info, err := host.Info()
+		if err != nil {
+			return err
+		}
+		fmt.Println(info)
 		if err := wr(host, "/tmp/file0"); err != nil {
 			return err
 		}

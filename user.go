@@ -180,7 +180,7 @@ func (u *User) Apply(host *Host) (itemStatus, error) {
 	if oldpw != newpw {
 		modified = true
 		//fmt.Printf("~ user %s (password)\n", u.Name)
-		if v.OS == "OpenBSD" {
+		if v.OS == "openbsd" {
 			// wish openbsd had chpasswd :'(
 			// this leaks the crypted password hash via process args.
 			// TODO maybe just buckle down and learn the proper way to lock the master file

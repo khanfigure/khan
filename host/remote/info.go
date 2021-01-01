@@ -36,24 +36,26 @@ func (host *Host) Info() (*hhost.Info, error) {
 	chunks := strings.Split(o, " ")
 
 	info := &hhost.Info{}
-
 	info.Uname = o
-	info.OS = chunks[0]
 
-	if info.OS == "OpenBSD" && len(chunks) > 4 {
+	// try to make like GOOS
+	info.OS = strings.ToLower(chunks[0])
+
+	if info.OS == "openbsd" && len(chunks) > 4 {
 		info.Hostname = chunks[1]
 		info.Kernel = chunks[2]
 		info.Arch = chunks[4]
-		if info.Arch == "amd64" {
-			// normalize just to make it easier
-			info.Arch = "x86_64"
-		}
-	} else if info.OS == "Linux" && len(chunks) > 4 {
+	} else if info.OS == "linux" && len(chunks) > 4 {
 		info.Hostname = chunks[1]
 		info.Kernel = chunks[2]
 		info.Arch = chunks[len(chunks)-2]
 	} else {
 		return nil, fmt.Errorf("Not sure how to parse uname -a: %#v", o)
+	}
+
+	// try to make like GOARCH
+	if info.Arch == "x86_64" {
+		info.Arch = "amd64"
 	}
 
 	return info, nil
