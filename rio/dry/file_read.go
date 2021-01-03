@@ -9,7 +9,7 @@ import (
 
 type File struct {
 	info    *FileInfo // nil info means file not present (deleted)
-	content []byte
+	content []byte    // nil content means content not cached. (zero length slice means empty file.)
 }
 
 type Reader struct {

@@ -1,5 +1,6 @@
 package khan
 
+/*
 import (
 	"bufio"
 	"strconv"
@@ -165,4 +166,4 @@ func readColonFile(host *Host, path string) ([][]string, error) {
 		ret = append(ret, vals)
 	}
 	return ret, bs.Err()
-}
+}*/

@@ -15,10 +15,10 @@ import (
 
 const (
 	// Found these in OpenBSD's source for the stat command :)
-	s_ifmt     = 0170000 // type of file mask
-	s_ifdir    = 0040000 // directory
-	s_ifreg    = 0100000 // regular
-	s_justmode = 0777    // this is me ignoring things like suid for now
+	S_ifmt     = 0170000 // type of file mask
+	S_ifdir    = 0040000 // directory
+	S_ifreg    = 0100000 // regular
+	S_justmode = 0777    // this is me ignoring things like suid for now
 )
 
 type FileInfo struct {
@@ -146,7 +146,7 @@ func ParseStat(osname, fpath, stdout, stderr string, execerr error) (*FileInfo, 
 		}
 		fi.Fmodtime = time.Unix(mtime, 0)
 
-		if fi.Fmode&s_ifmt == s_ifdir {
+		if fi.Fmode&S_ifmt == S_ifdir {
 			fi.Fisdir = true
 		}
 		return fi, nil
@@ -181,7 +181,7 @@ func ParseStat(osname, fpath, stdout, stderr string, execerr error) (*FileInfo, 
 		}
 		fi.Fmodtime = time.Unix(mtime, 0)
 
-		if fi.Fmode&s_ifmt == s_ifdir {
+		if fi.Fmode&S_ifmt == S_ifdir {
 			fi.Fisdir = true
 		}
 		return fi, nil

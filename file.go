@@ -6,8 +6,11 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/user"
+	"strings"
 	"syscall"
-	"time"
+
+	"github.com/desops/khan/rio/util"
 
 	"github.com/pmezard/go-difflib/difflib"
 )
@@ -108,7 +111,7 @@ func (f *File) Apply(host *Host) (itemStatus, error) {
 		if err != nil {
 			return 0, err
 		}
-		if err := host.Remove(f.Path); err != nil {
+		if err := host.rh.Remove(f.Path); err != nil {
 			return 0, err
 		}
 		return itemDeleted, nil
@@ -162,11 +165,11 @@ func (f *File) Apply(host *Host) (itemStatus, error) {
 	}
 
 	var (
-		buf    []byte
-		err    error
+		buf []byte
+		err error
 	)
 
-	buf, err = host.ReadFile(f.Path)
+	buf, err = host.rh.ReadFile(f.Path)
 
 	if err == nil && bytes.Compare(buf, []byte(content)) == 0 {
 		pstatus, err := f.applyperms(host)
@@ -205,7 +208,7 @@ func (f *File) Apply(host *Host) (itemStatus, error) {
 		fmt.Print(difftxt)
 	}
 
-	fh, err := host.Create(f.Path)
+	fh, err := host.rh.Create(f.Path)
 	if err != nil {
 		return 0, err
 	}
@@ -225,14 +228,17 @@ func (f *File) applyperms(host *Host) (itemStatus, error) {
 		mode = 0644
 	}
 
-	v := host.Virt
-
 	ustr := f.User
 	if ustr == "" {
-		if host.SSH {
-			ustr = host.Run.User
+		at := strings.IndexByte(host.Host, '@')
+		if host.SSH && at > -1 {
+			ustr = host.Host[:at]
 		} else {
-			ustr = os.Getenv("USER")
+			osu, err := user.Current()
+			if err != nil {
+				return 0, err
+			}
+			ustr = osu.Username
 		}
 	}
 	if ustr == "" {
@@ -253,6 +259,11 @@ func (f *File) applyperms(host *Host) (itemStatus, error) {
 		return 0, fmt.Errorf("Cannot determine group for managed file %v", f)
 	}
 
+	group, err := host.rh.Group(gstr)
+	if err != nil {
+		return 0, err
+	}
+
 	var (
 		uid     uint32
 		gid     uint32
@@ -260,10 +271,10 @@ func (f *File) applyperms(host *Host) (itemStatus, error) {
 		wantgid uint32
 	)
 
-	if wantuser == nil {
+	if user == nil {
 		return 0, fmt.Errorf("Unknown user %#v", ustr)
 	}
-	if wantgroup == nil {
+	if group == nil {
 		return 0, fmt.Errorf("Unknown group %#v", gstr)
 	}
 
@@ -276,55 +287,31 @@ func (f *File) applyperms(host *Host) (itemStatus, error) {
 	case *syscall.Stat_t:
 		uid = st.Uid
 		gid = st.Gid
-	case *FileInfo:
-		uid = st.uid
-		gid = st.gid
+	case *util.FileInfo:
+		uid = st.Uid()
+		gid = st.Gid()
 	default:
 		return 0, fmt.Errorf("Unhandled system stat type %T", fi.Sys())
 	}
 
-	// TODO TODO TODO
-
-
 	status := itemUnchanged
-
-	newfi := &FileInfo{
-		name:    fi.Name(),
-		size:    fi.Size(),
-		modtime: fi.ModTime(),
-		isdir:   fi.IsDir(),
-		uid:     wantuid,
-		gid:     wantgid,
-		mode:    mode,
-	}
 
 	if wantuid != uid || wantgid != gid {
 		fmt.Printf("wantuid %d wantgid %d uid %d gid %d\n", wantuid, wantgid, uid, gid)
 		status = itemModified
 
-		if !host.Run.Dry {
-			if err := host.Chown(f.Path, wantuid, wantgid); err != nil {
-				return 0, err
-			}
+		if err := host.rh.Chown(f.Path, wantuid, wantgid); err != nil {
+			return 0, err
 		}
-
 	}
 
-	if fi.Mode()&s_justmode != mode {
-		fmt.Printf("current: %o , masked %o , want: %o\n", uint32(fi.Mode()), uint32(fi.Mode())&s_justmode, mode)
+	if fi.Mode()&util.S_justmode != mode {
+		fmt.Printf("current: %o , masked %o , want: %o\n", uint32(fi.Mode()), uint32(fi.Mode())&util.S_justmode, mode)
 		status = itemModified
 
-		if !host.Run.Dry {
-			if err := host.Chmod(f.Path, mode); err != nil {
-				return 0, err
-			}
+		if err := host.rh.Chmod(f.Path, mode); err != nil {
+			return 0, err
 		}
-	}
-
-	if status == itemModified {
-		host.VirtMu.Lock()
-		v.Files[f.Path] = newfi
-		host.VirtMu.Unlock()
 	}
 
 	return status, nil

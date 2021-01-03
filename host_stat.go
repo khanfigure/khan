@@ -1,5 +1,6 @@
 package khan
 
+/*
 import (
 	"bytes"
 	"fmt"
@@ -248,4 +249,4 @@ func (host *Host) Stat(path string) (os.FileInfo, error) {
 	}
 
 	return fi, nil
-}
+}*/

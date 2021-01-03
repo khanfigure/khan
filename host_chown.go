@@ -1,5 +1,6 @@
 package khan
 
+/*
 import (
 	"context"
 	"fmt"
@@ -32,4 +33,4 @@ func (host *Host) Chmod(path string, perms os.FileMode) error {
 	}
 
 	return nil
-}
+}*/

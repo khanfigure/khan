@@ -2,12 +2,15 @@ package remote
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"os"
 	"strings"
 	"sync"
-	"syscall"
+
+	"github.com/desops/khan/rio"
+	"github.com/desops/khan/rio/util"
 
 	"github.com/keegancsmith/shell"
 )
@@ -86,37 +89,17 @@ func (host *Host) Create(path string) (io.WriteCloser, error) {
 }
 
 func (host *Host) Remove(fpath string) error {
-	session, err := host.pool.Get(host.connect)
-	if err != nil {
+	ctx := context.Background()
+	if err := host.Exec(rio.Command(ctx, "rm", fpath)); err != nil {
 		return err
 	}
-
-	outbuf := &bytes.Buffer{}
-	errbuf := &bytes.Buffer{}
-
-	session.Stdout = outbuf
-	session.Stderr = errbuf
-
-	cmdline := "rm -f " + shell.ReadableEscapeArg(fpath)
-
-	if err := session.Run(cmdline); err != nil {
-		e := strings.TrimSpace(errbuf.String())
-
-		if strings.HasPrefix(e, "rm: ") && strings.HasSuffix(e, "No such file or directory") {
-			// emulate os.Stat
-			return &os.PathError{
-				Op:   "rm",
-				Path: fpath,
-				Err:  syscall.ENOENT,
-			}
-		} else {
-			// Bundle up stderr and hope it's useful
-			err = fmt.Errorf("Command %#v on host %#v failed with %w: %s",
-				cmdline, host.connect, err, e)
-		}
-
-		return err
-	}
-
 	return nil
+}
+
+func (host *Host) Chown(fpath string, uid uint32, gid uint32) error {
+	return util.Chown(host, fpath, uid, gid)
+}
+
+func (host *Host) Chmod(fpath string, perms os.FileMode) error {
+	return util.Chmod(host, fpath, perms)
 }

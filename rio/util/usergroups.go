@@ -173,3 +173,54 @@ func DeleteGroup(host rio.Host, name string) error {
 	}
 	return nil
 }
+
+func CreateUser(host rio.Host, user *rio.User) error {
+	ctx := context.Background()
+	if err := host.Exec(rio.Command(ctx, "useradd",
+		"-u", strconv.FormatUint(uint64(user.Uid), 10),
+		"-d", user.Home,
+		"-g", user.Group,
+		"-G", strings.Join(user.Groups, ","),
+		"-c", user.Comment,
+		user.Name)); err != nil {
+		return err
+	}
+	return nil
+}
+
+func UpdateUser(host rio.Host, old *rio.User, user *rio.User) error {
+	ctx := context.Background()
+	var ops []string
+
+	if old.Uid != user.Uid {
+		ops = append(ops, "-u", strconv.FormatUint(uint64(user.Uid), 10))
+	}
+	if old.Home != user.Home {
+		ops = append(ops, "-d", user.Home)
+	}
+	if old.Group != user.Group {
+		ops = append(ops, "-g", user.Group)
+	}
+	if strings.Join(old.Groups, ",") != strings.Join(user.Groups, ",") {
+		ops = append(ops, "-G", strings.Join(user.Groups, ","))
+	}
+	if old.Comment != user.Comment {
+		ops = append(ops, "-c", user.Comment)
+	}
+	if len(ops) == 0 {
+		return nil
+	}
+	ops = append(ops, user.Name)
+	if err := host.Exec(rio.Command(ctx, "usermod", ops...)); err != nil {
+		return err
+	}
+	return nil
+}
+
+func DeleteUser(host rio.Host, name string) error {
+	ctx := context.Background()
+	if err := host.Exec(rio.Command(ctx, "userdel", name)); err != nil {
+		return err
+	}
+	return nil
+}

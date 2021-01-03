@@ -1,5 +1,6 @@
 package khan
 
+/*
 import (
 	"bytes"
 	"fmt"
@@ -64,4 +65,4 @@ func (host *Host) getInfo() error {
 	}
 
 	return nil
-}
+}*/

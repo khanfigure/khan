@@ -25,3 +25,11 @@ func (host *Host) ReadFile(fpath string) ([]byte, error) {
 func (host *Host) Stat(fpath string) (os.FileInfo, error) {
 	return os.Stat(fpath)
 }
+
+func (host *Host) Chmod(fpath string, mode os.FileMode) error {
+	return os.Chmod(fpath, mode)
+}
+
+func (host *Host) Chown(fpath string, uid uint32, gid uint32) error {
+	return os.Chown(fpath, int(uid), int(gid))
+}
