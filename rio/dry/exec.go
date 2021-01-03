@@ -3,10 +3,10 @@ package dry
 import (
 	"fmt"
 
-	hhost "github.com/desops/khan/host"
+	"github.com/desops/khan/rio"
 )
 
-func (host *Host) Exec(cmd *hhost.Cmd) error {
+func (host *Host) Exec(cmd *rio.Cmd) error {
 	fmt.Println(host, cmd)
 
 	if cmd.ReadOnly && host.cascade != nil {

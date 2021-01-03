@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/desops/khan/host/util"
+	"github.com/desops/khan/rio/util"
 
 	"github.com/keegancsmith/shell"
 )

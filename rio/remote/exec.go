@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"strings"
 
-	hhost "github.com/desops/khan/host"
+	"github.com/desops/khan/rio"
 
 	"github.com/keegancsmith/shell"
 )
 
-func (host *Host) Exec(cmd *hhost.Cmd) error {
+func (host *Host) Exec(cmd *rio.Cmd) error {
 	fmt.Println(host, cmd)
 
 	errbuf := &bytes.Buffer{}
@@ -57,7 +57,7 @@ func (host *Host) Exec(cmd *hhost.Cmd) error {
 	err = session.Run(cmdline)
 
 	if err != nil {
-		return &hhost.CmdErr{Cmd: cmd, StdErr: strings.TrimSpace(errbuf.String()), ExecErr: err}
+		return &rio.CmdErr{Cmd: cmd, StdErr: strings.TrimSpace(errbuf.String()), ExecErr: err}
 	}
 	return nil
 }

@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"strings"
 
-	hhost "github.com/desops/khan/host"
+	"github.com/desops/khan/rio"
 )
 
-func (host *Host) Info() (*hhost.Info, error) {
+func (host *Host) Info() (*rio.Info, error) {
 	host.infomu.Lock()
 	defer host.infomu.Unlock()
 
@@ -35,7 +35,7 @@ func (host *Host) Info() (*hhost.Info, error) {
 	o := strings.TrimSpace(outbuf.String())
 	chunks := strings.Split(o, " ")
 
-	info := &hhost.Info{}
+	info := &rio.Info{}
 	info.Uname = o
 
 	// try to make like GOOS

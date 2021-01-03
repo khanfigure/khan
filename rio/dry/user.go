@@ -3,11 +3,11 @@ package dry
 import (
 	"fmt"
 
-	hhost "github.com/desops/khan/host"
-	"github.com/desops/khan/host/util"
+	"github.com/desops/khan/rio"
+	"github.com/desops/khan/rio/util"
 )
 
-func (host *Host) Group(name string) (*hhost.Group, error) {
+func (host *Host) Group(name string) (*rio.Group, error) {
 	host.usersmu.Lock()
 	defer host.usersmu.Unlock()
 
@@ -21,7 +21,7 @@ func (host *Host) Group(name string) (*hhost.Group, error) {
 	return nil, nil
 }
 
-func (host *Host) CreateGroup(group *hhost.Group) error {
+func (host *Host) CreateGroup(group *rio.Group) error {
 	host.usersmu.Lock()
 	defer host.usersmu.Unlock()
 
@@ -44,7 +44,7 @@ func (host *Host) CreateGroup(group *hhost.Group) error {
 	return nil
 }
 
-func (host *Host) UpdateGroup(group *hhost.Group) error {
+func (host *Host) UpdateGroup(group *rio.Group) error {
 	host.usersmu.Lock()
 	defer host.usersmu.Unlock()
 

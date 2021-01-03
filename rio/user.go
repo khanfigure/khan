@@ -1,4 +1,4 @@
-package host
+package rio
 
 type User struct {
 	Name   string

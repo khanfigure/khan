@@ -4,16 +4,16 @@ import (
 	"os"
 	"runtime"
 
-	hhost "github.com/desops/khan/host"
+	"github.com/desops/khan/rio"
 )
 
-func (host *Host) Info() (*hhost.Info, error) {
+func (host *Host) Info() (*rio.Info, error) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		return nil, err
 	}
 
-	return &hhost.Info{
+	return &rio.Info{
 		Hostname: hostname,
 		OS:       runtime.GOOS,
 		Arch:     runtime.GOARCH,

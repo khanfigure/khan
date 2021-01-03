@@ -5,10 +5,10 @@ import (
 	"strconv"
 	"strings"
 
-	hhost "github.com/desops/khan/host"
+	"github.com/desops/khan/rio"
 )
 
-func LoadPasswords(host hhost.Host) (map[string]*hhost.Password, error) {
+func LoadPasswords(host rio.Host) (map[string]*rio.Password, error) {
 	info, err := host.Info()
 	if err != nil {
 		return nil, err
@@ -30,13 +30,13 @@ func LoadPasswords(host hhost.Host) (map[string]*hhost.Password, error) {
 		return nil, err
 	}
 
-	r := map[string]*hhost.Password{}
+	r := map[string]*rio.Password{}
 
 	for _, row := range sh_rows {
 		if len(row) < 8 {
 			continue
 		}
-		r[row[0]] = &hhost.Password{
+		r[row[0]] = &rio.Password{
 			Name:  row[0],
 			Crypt: row[1],
 		}
@@ -46,14 +46,14 @@ func LoadPasswords(host hhost.Host) (map[string]*hhost.Password, error) {
 	return r, nil
 }
 
-func LoadUserGroups(host hhost.Host) (map[string]*hhost.User, map[string]*hhost.Group, error) {
+func LoadUserGroups(host rio.Host) (map[string]*rio.User, map[string]*rio.Group, error) {
 	//info, err := host.Info()
 	//if err != nil {
 	//	return nil, nil, err
 	//}
 
-	users := map[string]*hhost.User{}
-	groups := map[string]*hhost.Group{}
+	users := map[string]*rio.User{}
+	groups := map[string]*rio.Group{}
 
 	userGids := map[string]uint32{}
 	gids := map[uint32]string{}
@@ -83,7 +83,7 @@ func LoadUserGroups(host hhost.Host) (map[string]*hhost.User, map[string]*hhost.
 
 		userGids[row[0]] = uint32(gid)
 
-		u := hhost.User{
+		u := rio.User{
 			Name:  row[0],
 			Uid:   uint32(uid),
 			Home:  row[5],
@@ -116,7 +116,7 @@ func LoadUserGroups(host hhost.Host) (map[string]*hhost.User, map[string]*hhost.
 		if err != nil {
 			continue
 		}
-		g := hhost.Group{
+		g := rio.Group{
 			Name: row[0],
 			Gid:  uint32(id),
 		}
@@ -148,27 +148,27 @@ func LoadUserGroups(host hhost.Host) (map[string]*hhost.User, map[string]*hhost.
 	return users, groups, nil
 }
 
-func CreateGroup(host hhost.Host, group *hhost.Group) error {
+func CreateGroup(host rio.Host, group *rio.Group) error {
 	ctx := context.Background()
-	if err := host.Exec(hhost.Command(ctx, "groupadd", "-g", strconv.FormatUint(uint64(group.Gid), 10), group.Name)); err != nil {
+	if err := host.Exec(rio.Command(ctx, "groupadd", "-g", strconv.FormatUint(uint64(group.Gid), 10), group.Name)); err != nil {
 		return err
 	}
 	return nil
 }
 
-func UpdateGroup(host hhost.Host, old *hhost.Group, group *hhost.Group) error {
+func UpdateGroup(host rio.Host, old *rio.Group, group *rio.Group) error {
 	ctx := context.Background()
 	if old.Gid != group.Gid {
-		if err := host.Exec(hhost.Command(ctx, "groupmod", "-g", strconv.FormatUint(uint64(group.Gid), 10), group.Name)); err != nil {
+		if err := host.Exec(rio.Command(ctx, "groupmod", "-g", strconv.FormatUint(uint64(group.Gid), 10), group.Name)); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func DeleteGroup(host hhost.Host, name string) error {
+func DeleteGroup(host rio.Host, name string) error {
 	ctx := context.Background()
-	if err := host.Exec(hhost.Command(ctx, "groupdel", name)); err != nil {
+	if err := host.Exec(rio.Command(ctx, "groupdel", name)); err != nil {
 		return err
 	}
 	return nil

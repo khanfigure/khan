@@ -7,10 +7,10 @@ import (
 	"net"
 	"os"
 
-	"github.com/desops/khan/host"
-	"github.com/desops/khan/host/dry"
-	"github.com/desops/khan/host/local"
-	"github.com/desops/khan/host/remote"
+	"github.com/desops/khan/rio"
+	"github.com/desops/khan/rio/dry"
+	"github.com/desops/khan/rio/local"
+	"github.com/desops/khan/rio/remote"
 
 	"github.com/desops/sshpool"
 )
@@ -44,7 +44,7 @@ func run() error {
 	pool := sshpool.New(sshconfig, &sshpool.PoolConfig{Debug: true})
 	defer pool.Close()
 
-	var hosts []host.Host
+	var hosts []rio.Host
 
 	_ = local.Host{}
 
@@ -88,7 +88,7 @@ func run() error {
 	return nil
 }
 
-func rd(host host.Host, fpath string) error {
+func rd(host rio.Host, fpath string) error {
 	content := "hi " + fpath + "\n"
 
 	buf, err := host.ReadFile(fpath)
@@ -104,7 +104,7 @@ func rd(host host.Host, fpath string) error {
 	return nil
 }
 
-func wr(host host.Host, fpath string) error {
+func wr(host rio.Host, fpath string) error {
 	content := "hi " + fpath + "\n"
 
 	fh, err := host.Create(fpath)
