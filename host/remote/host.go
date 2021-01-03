@@ -3,7 +3,7 @@ package remote
 import (
 	"sync"
 
-	"github.com/desops/khan/host"
+	hhost "github.com/desops/khan/host"
 
 	"github.com/desops/sshpool"
 )
@@ -13,7 +13,12 @@ type Host struct {
 	connect string
 
 	infomu sync.Mutex
-	info   *host.Info
+	info   *hhost.Info
+
+	usersmu   sync.Mutex
+	users     map[string]*hhost.User
+	groups    map[string]*hhost.Group
+	passwords map[string]*hhost.Password
 }
 
 func (host *Host) String() string {

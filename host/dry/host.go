@@ -17,6 +17,11 @@ type Host struct {
 
 	fsmu sync.Mutex
 	fs   map[string]*File
+
+	usersmu   sync.Mutex
+	users     map[string]*hhost.User
+	groups    map[string]*hhost.Group
+	passwords map[string]*hhost.Password
 }
 
 func (host *Host) String() string {
@@ -25,10 +30,13 @@ func (host *Host) String() string {
 
 func New(uid, gid uint32, cascade hhost.Host) *Host {
 	return &Host{
-		uid:     uid,
-		gid:     gid,
-		cascade: cascade,
-		fs:      map[string]*File{},
+		uid:       uid,
+		gid:       gid,
+		cascade:   cascade,
+		fs:        map[string]*File{},
+		users:     map[string]*hhost.User{},
+		groups:    map[string]*hhost.Group{},
+		passwords: map[string]*hhost.Password{},
 	}
 }
 

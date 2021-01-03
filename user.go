@@ -92,164 +92,164 @@ func (u *User) Provides() []string {
 }
 
 func (u *User) Apply(host *Host) (itemStatus, error) {
-	if err := host.getUserGroups(true); err != nil {
-		return 0, err
-	}
-
-	host.VirtMu.Lock()
-	defer host.VirtMu.Unlock()
-
-	v := host.Virt
-
-	usergroup := u.Group
-	if usergroup == "" {
-		usergroup = u.Name
-	}
-
-	userhome := u.Home
-	if userhome == "" {
-		userhome = "/home/" + u.Name
-	}
-
-	old := v.cacheUsers[u.Name]
-	if host.Run.Dry {
-		cachedold, hit := v.Users[u.Name]
-		if hit {
-			old = cachedold
+	/*	if err := host.getUserGroups(true); err != nil {
+			return 0, err
 		}
-	}
 
-	if u.Delete {
+		host.VirtMu.Lock()
+		defer host.VirtMu.Unlock()
+
+		v := host.Virt
+
+		usergroup := u.Group
+		if usergroup == "" {
+			usergroup = u.Name
+		}
+
+		userhome := u.Home
+		if userhome == "" {
+			userhome = "/home/" + u.Name
+		}
+
+		old := v.cacheUsers[u.Name]
+		if host.Run.Dry {
+			cachedold, hit := v.Users[u.Name]
+			if hit {
+				old = cachedold
+			}
+		}
+
+		if u.Delete {
+			if old == nil {
+				return itemUnchanged, nil
+			}
+			if err := printExec(host, "userdel", old.Name); err != nil {
+				return 0, err
+			}
+			v.Users[u.Name] = nil // not deleted on purpose: tombstone
+			delete(v.cacheUsers, u.Name)
+			return itemDeleted, nil
+		}
+
+		created := false
+		modified := false
+
 		if old == nil {
-			return itemUnchanged, nil
-		}
-		if err := printExec(host, "userdel", old.Name); err != nil {
-			return 0, err
-		}
-		v.Users[u.Name] = nil // not deleted on purpose: tombstone
-		delete(v.cacheUsers, u.Name)
-		return itemDeleted, nil
-	}
+			//fmt.Printf("+ user %s (group %s)\n", u.Name, usergroup)
+			created = true
 
-	created := false
-	modified := false
-
-	if old == nil {
-		//fmt.Printf("+ user %s (group %s)\n", u.Name, usergroup)
-		created = true
-
-		args := []string{"-d", userhome, "-g", usergroup, "-u", strconv.FormatUint(uint64(u.Uid), 10), u.Name}
-		if u.Gecos != "" {
-			args = append(args, "-c", u.Gecos)
-		}
-		if len(u.Groups) > 0 {
-			args = append(args, "-G", strings.Join(u.Groups, ","))
-		}
-		if err := printExec(host, "useradd", args...); err != nil {
-			return 0, err
-		}
-		old = &User{
-			Name:   u.Name,
-			Uid:    u.Uid,
-			Group:  usergroup,
-			Groups: u.Groups,
-			Gecos:  u.Gecos,
-		}
-		v.Users[u.Name] = old
-		v.cacheUsers[u.Name] = old
-	}
-
-	if old.Uid != u.Uid {
-		//fmt.Printf("~ user %s (uid %d → %d)\n", u.Name, old.Uid, u.Uid)
-		modified = true
-
-		if err := printExec(host, "usermod", "-u", strconv.FormatUint(uint64(u.Uid), 10), u.Name); err != nil {
-			return 0, err
-		}
-		old.Uid = u.Uid
-	}
-
-	oldpw := old.Password
-	if oldpw == "" && !old.BlankPassword {
-		oldpw = "!"
-	}
-	newpw := u.Password
-	if newpw == "" && !u.BlankPassword {
-		newpw = "!"
-	}
-	if oldpw != newpw {
-		modified = true
-		//fmt.Printf("~ user %s (password)\n", u.Name)
-		if v.OS == "openbsd" {
-			// wish openbsd had chpasswd :'(
-			// this leaks the crypted password hash via process args.
-			// TODO maybe just buckle down and learn the proper way to lock the master file
-			// and modify it directly?
-			if err := printExec(host, "usermod", "-p", newpw, u.Name); err != nil {
+			args := []string{"-d", userhome, "-g", usergroup, "-u", strconv.FormatUint(uint64(u.Uid), 10), u.Name}
+			if u.Gecos != "" {
+				args = append(args, "-c", u.Gecos)
+			}
+			if len(u.Groups) > 0 {
+				args = append(args, "-G", strings.Join(u.Groups, ","))
+			}
+			if err := printExec(host, "useradd", args...); err != nil {
 				return 0, err
 			}
-		} else {
-			input := bytes.NewBuffer([]byte(u.Name + ":" + newpw + "\n"))
-			if err := printExecStdin(host, input, "chpasswd", "-e"); err != nil {
+			old = &User{
+				Name:   u.Name,
+				Uid:    u.Uid,
+				Group:  usergroup,
+				Groups: u.Groups,
+				Gecos:  u.Gecos,
+			}
+			v.Users[u.Name] = old
+			v.cacheUsers[u.Name] = old
+		}
+
+		if old.Uid != u.Uid {
+			//fmt.Printf("~ user %s (uid %d → %d)\n", u.Name, old.Uid, u.Uid)
+			modified = true
+
+			if err := printExec(host, "usermod", "-u", strconv.FormatUint(uint64(u.Uid), 10), u.Name); err != nil {
 				return 0, err
 			}
+			old.Uid = u.Uid
 		}
-		old.Password = u.Password
-		old.BlankPassword = u.BlankPassword
-	}
 
-	resetgroups := false
-	sort.Strings(old.Groups)
-	sort.Strings(u.Groups)
-	if len(old.Groups) != len(u.Groups) {
-		resetgroups = true
-	} else if len(u.Groups) > 0 {
-		for i, gg := range old.Groups {
-			if u.Groups[i] != gg {
-				resetgroups = true
-				break
+		oldpw := old.Password
+		if oldpw == "" && !old.BlankPassword {
+			oldpw = "!"
+		}
+		newpw := u.Password
+		if newpw == "" && !u.BlankPassword {
+			newpw = "!"
+		}
+		if oldpw != newpw {
+			modified = true
+			//fmt.Printf("~ user %s (password)\n", u.Name)
+			if v.OS == "openbsd" {
+				// wish openbsd had chpasswd :'(
+				// this leaks the crypted password hash via process args.
+				// TODO maybe just buckle down and learn the proper way to lock the master file
+				// and modify it directly?
+				if err := printExec(host, "usermod", "-p", newpw, u.Name); err != nil {
+					return 0, err
+				}
+			} else {
+				input := bytes.NewBuffer([]byte(u.Name + ":" + newpw + "\n"))
+				if err := printExecStdin(host, input, "chpasswd", "-e"); err != nil {
+					return 0, err
+				}
+			}
+			old.Password = u.Password
+			old.BlankPassword = u.BlankPassword
+		}
+
+		resetgroups := false
+		sort.Strings(old.Groups)
+		sort.Strings(u.Groups)
+		if len(old.Groups) != len(u.Groups) {
+			resetgroups = true
+		} else if len(u.Groups) > 0 {
+			for i, gg := range old.Groups {
+				if u.Groups[i] != gg {
+					resetgroups = true
+					break
+				}
 			}
 		}
-	}
-	if resetgroups {
-		oldstr := strings.Join(old.Groups, ", ")
-		newstr := strings.Join(u.Groups, ", ")
-		if oldstr == "" {
-			oldstr = "none"
+		if resetgroups {
+			oldstr := strings.Join(old.Groups, ", ")
+			newstr := strings.Join(u.Groups, ", ")
+			if oldstr == "" {
+				oldstr = "none"
+			}
+			if newstr == "" {
+				newstr = "none"
+			}
+			modified = true
+			//fmt.Printf("~ user %s groups (%s → %s)\n", u.Name, oldstr, newstr)
+			if err := printExec(host, "usermod", "-G", strings.Join(u.Groups, ","), u.Name); err != nil {
+				return 0, err
+			}
+			old.Groups = u.Groups
 		}
-		if newstr == "" {
-			newstr = "none"
-		}
-		modified = true
-		//fmt.Printf("~ user %s groups (%s → %s)\n", u.Name, oldstr, newstr)
-		if err := printExec(host, "usermod", "-G", strings.Join(u.Groups, ","), u.Name); err != nil {
-			return 0, err
-		}
-		old.Groups = u.Groups
-	}
 
-	if old.Group != usergroup {
-		modified = true
-		//fmt.Printf("~ user %s (primary group %s → %s)\n", u.Name, old.Group, usergroup)
-		if err := printExec(host, "usermod", "-g", usergroup, u.Name); err != nil {
-			return 0, err
+		if old.Group != usergroup {
+			modified = true
+			//fmt.Printf("~ user %s (primary group %s → %s)\n", u.Name, old.Group, usergroup)
+			if err := printExec(host, "usermod", "-g", usergroup, u.Name); err != nil {
+				return 0, err
+			}
+			old.Group = usergroup
 		}
-		old.Group = usergroup
-	}
 
-	if old.Home != userhome {
-		modified = true
-		if err := printExec(host, "usermod", "-d", userhome, u.Name); err != nil {
-			return 0, err
+		if old.Home != userhome {
+			modified = true
+			if err := printExec(host, "usermod", "-d", userhome, u.Name); err != nil {
+				return 0, err
+			}
+			old.Home = userhome
 		}
-		old.Home = userhome
-	}
 
-	if created {
-		return itemCreated, nil
-	}
-	if modified {
-		return itemModified, nil
-	}
+		if created {
+			return itemCreated, nil
+		}
+		if modified {
+			return itemModified, nil
+		}*/
 	return itemUnchanged, nil
 }
