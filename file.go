@@ -101,43 +101,16 @@ func (f *File) Apply(host *Host) (itemStatus, error) {
 	status := itemModified
 
 	if f.Delete {
-
-		if host.Run.Dry {
-			host.VirtMu.RLock()
-			fi, hit := host.Virt.Files[f.Path]
-			host.VirtMu.RUnlock()
-			if hit && fi == nil {
-				return itemUnchanged, nil
-			}
-		}
-
-		_, err := host.Stat(f.Path)
+		_, err := host.rh.Stat(f.Path)
 		if err != nil && iserrnotfound(err) {
 			return itemUnchanged, nil
 		}
 		if err != nil {
-			// You know... I think this isn't safe and we should
-			// return the error. It's probably a permission error.
-			// I keep going back and forth on this.
 			return 0, err
 		}
-
-		if host.Run.Verbose && err != nil {
-			//fmt.Fprintln(os.Stderr, "stat", f.Path, "error:", err)
+		if err := host.Remove(f.Path); err != nil {
+			return 0, err
 		}
-
-		if !host.Run.Dry {
-			err := host.Remove(f.Path)
-			if err != nil {
-				return 0, err
-			}
-		}
-
-		host.VirtMu.Lock()
-		host.Virt.Files[f.Path] = nil
-		delete(host.Virt.Content, f.Path)
-		host.VirtMu.Unlock()
-
 		return itemDeleted, nil
 	}
 
@@ -177,7 +150,7 @@ func (f *File) Apply(host *Host) (itemStatus, error) {
 			content = buf.String()
 		} else if f.Local != "" {
 			// copy from another path on managed host
-			srcbuf, err := host.ReadFile(f.Local)
+			srcbuf, err := host.rh.ReadFile(f.Local)
 			if err != nil {
 				return 0, err
 			}
@@ -191,31 +164,9 @@ func (f *File) Apply(host *Host) (itemStatus, error) {
 	var (
 		buf    []byte
 		err    error
-		cached bool
 	)
 
-	if host.Run.Dry {
-		host.VirtMu.RLock()
-		cfi, fihit := host.Virt.Files[f.Path]
-		ccontent := host.Virt.Content[f.Path]
-		host.VirtMu.RUnlock()
-		if fihit {
-			cached = true
-			if cfi == nil {
-				err = &os.PathError{
-					Op:   "read",
-					Path: f.Path,
-					Err:  syscall.ENOENT,
-				}
-			} else {
-				buf = []byte(ccontent)
-			}
-		}
-	}
-
-	if !cached {
-		buf, err = host.ReadFile(f.Path)
-	}
+	buf, err = host.ReadFile(f.Path)
 
 	if err == nil && bytes.Compare(buf, []byte(content)) == 0 {
 		pstatus, err := f.applyperms(host)
@@ -228,17 +179,6 @@ func (f *File) Apply(host *Host) (itemStatus, error) {
 		if iserrnotfound(err) {
 			status = itemCreated
 		} else {
-			// This seemed risky.
-			// If the file could not be read, don't assume
-			// we should continue with writing to it.
-			//		status = itemModified
-			//		if err != nil {
-			//			if host.Run.Verbose {
-			//				fmt.Printf("Error reading %#v: %v\n", f.Path, err)
-			//			}
-			//		}
-
-			// Instead let's return the read error.
 			return 0, err
 		}
 	}
@@ -265,21 +205,6 @@ func (f *File) Apply(host *Host) (itemStatus, error) {
 		fmt.Print(difftxt)
 	}
 
-	if host.Run.Dry {
-		host.VirtMu.Lock()
-		host.Virt.Files[f.Path] = &FileInfo{
-			name:    f.Path,
-			size:    int64(len(content)),
-			mode:    0644, // TODO
-			modtime: time.Now(),
-			isdir:   false,
-			// TODO uid and gid
-		}
-		host.Virt.Content[f.Path] = content
-		host.VirtMu.Unlock()
-		return status, nil
-	}
-
 	fh, err := host.Create(f.Path)
 	if err != nil {
 		return 0, err
@@ -295,12 +220,6 @@ func (f *File) Apply(host *Host) (itemStatus, error) {
 }
 
 func (f *File) applyperms(host *Host) (itemStatus, error) {
-
-	// need this data to resolve uid->name and gid->name of files
-	if err := host.getUserGroups(false); err != nil {
-		return 0, err
-	}
-
 	mode := f.Mode
 	if mode == 0 {
 		mode = 0644
@@ -308,38 +227,29 @@ func (f *File) applyperms(host *Host) (itemStatus, error) {
 
 	v := host.Virt
 
-	usr := f.User
-	if usr == "" {
+	ustr := f.User
+	if ustr == "" {
 		if host.SSH {
-			usr = host.Run.User
+			ustr = host.Run.User
 		} else {
-			usr = os.Getenv("USER")
+			ustr = os.Getenv("USER")
 		}
 	}
-
-	if usr == "" {
+	if ustr == "" {
 		return 0, fmt.Errorf("Cannot determine user for managed file %v", f)
 	}
 
-	grp := f.Group
-	if grp == "" {
-		grp = usr
-		// Actually, default to the login group of the user if we can
-		host.VirtMu.Lock()
-		u := v.cacheUsers[usr]
-		if host.Run.Dry {
-			cu, hit := v.Users[usr]
-			if hit {
-				u = cu
-			}
-		}
-		if u != nil {
-			grp = u.Group
-		}
-		host.VirtMu.Unlock()
+	user, err := host.rh.User(ustr)
+	if err != nil {
+		return 0, err
 	}
 
-	if grp == "" {
+	gstr := f.Group
+	if gstr == "" {
+		gstr = user.Group
+	}
+
+	if gstr == "" {
 		return 0, fmt.Errorf("Cannot determine group for managed file %v", f)
 	}
 
@@ -350,45 +260,16 @@ func (f *File) applyperms(host *Host) (itemStatus, error) {
 		wantgid uint32
 	)
 
-	host.VirtMu.RLock()
-	wantuser := v.cacheUsers[usr]
-	wantgroup := v.cacheGroups[grp]
-	if host.Run.Dry {
-		cu, uok := v.Users[usr]
-		if uok {
-			wantuser = cu
-		}
-		cg, gok := v.Groups[grp]
-		if gok {
-			wantgroup = cg
-		}
-	}
-	if wantuser != nil {
-		wantuid = wantuser.Uid
-	}
-	if wantgroup != nil {
-		wantgid = wantgroup.Gid
-	}
-	cachefi, hit := v.Files[f.Path]
-	host.VirtMu.RUnlock()
-
 	if wantuser == nil {
-		return 0, fmt.Errorf("Unknown user %#v", f.User)
+		return 0, fmt.Errorf("Unknown user %#v", ustr)
 	}
 	if wantgroup == nil {
-		return 0, fmt.Errorf("Unknown group %#v", f.Group)
+		return 0, fmt.Errorf("Unknown group %#v", gstr)
 	}
 
-	var fi os.FileInfo
-
-	if host.Run.Dry && hit {
-		fi = cachefi
-	} else {
-		ofi, err := host.Stat(f.Path)
-		if err != nil {
-			return 0, err
-		}
-		fi = ofi
+	fi, err := host.rh.Stat(f.Path)
+	if err != nil {
+		return 0, err
 	}
 
 	switch st := fi.Sys().(type) {
@@ -401,6 +282,9 @@ func (f *File) applyperms(host *Host) (itemStatus, error) {
 	default:
 		return 0, fmt.Errorf("Unhandled system stat type %T", fi.Sys())
 	}
+
+	// TODO TODO TODO
+
 
 	status := itemUnchanged
 

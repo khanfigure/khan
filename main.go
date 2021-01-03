@@ -7,6 +7,10 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/desops/khan/rio/local"
+	"github.com/desops/khan/rio/remote"
+	"github.com/desops/khan/rio/dry"
+
 	"github.com/desops/sshpool"
 	"github.com/flosch/pongo2/v4"
 	"github.com/spf13/pflag"
@@ -59,37 +63,76 @@ func Apply() error {
 
 	pflag.Parse()
 
-	anyssh := false
-
 	if localmode {
 		hostname, err := os.Hostname()
 		if err != nil {
 			return err
 		}
+		rh := local.New()
+		if r.Dry {
+			rh = dry.New(os.Geteuid(), os.Getegid(), rh)
+		}
+
 		r.Hosts = append(r.Hosts, &Host{
 			Name: hostname,
 			SSH:  false,
 			Virt: NewVirtual(),
 			Run:  r,
+			rh: rh,
 		})
 	}
 
-	if len(hostlist) > 0 {
-		anyssh = true
 		for _, h := range hostlist {
+		if r.Pool == nil {
+			// initialize SSH pool
+		socket := os.Getenv("SSH_AUTH_SOCK")
+		conn, err := net.Dial("unix", socket)
+		if err != nil {
+			return fmt.Errorf("Failed to open SSH_AUTH_SOCK: %w", err)
+		}
+		agentClient := agent.NewClient(conn)
+		sshconfig := &ssh.ClientConfig{
+			User: r.User,
+			Auth: []ssh.AuthMethod{
+				ssh.PublicKeysCallback(agentClient.Signers),
+			},
+			HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+				// TODO
+				return nil
+			},
+			BannerCallback: ssh.BannerDisplayStderr(),
+		}
+
+		r.Pool = sshpool.New(sshconfig, &sshpool.PoolConfig{Debug: false}) //r.Verbose})
+		}
 			name := h
 			if i := strings.IndexByte(name, ':'); i > -1 {
 				name = name[:i]
 			}
+
+			rh := remote.New(r.Pool, h)
+			if r.Dry {
+				// This uid/gid guess is incorrect. TODO: Concurrently SSH to all the hosts and
+				// get this info correctly. This could double-serve as a pool warmup :)
+				uid := os.Geteuid()
+				gid := os.Getegid()
+				at := strings.IndexByte(h, '@')
+				if at > -1 && h[:at] == "root" {
+					uid = 0
+					gid = 0
+				}
+				rh = dry.New(uid, gid, rh)
+			}
+
 			r.Hosts = append(r.Hosts, &Host{
 				Name: name,
 				SSH:  true,
 				Host: h,
 				Virt: NewVirtual(),
 				Run:  r,
+				rh: rh,
 			})
 		}
-	}
 
 	if len(r.Hosts) == 0 {
 		fmt.Println("Nothing to do: No remote hosts (-h/--host) or local host (-l/--local) were specified")
@@ -114,25 +157,6 @@ func Apply() error {
 	fmt.Println(title)
 
 	if anyssh {
-		socket := os.Getenv("SSH_AUTH_SOCK")
-		conn, err := net.Dial("unix", socket)
-		if err != nil {
-			return fmt.Errorf("Failed to open SSH_AUTH_SOCK: %w", err)
-		}
-		agentClient := agent.NewClient(conn)
-		sshconfig := &ssh.ClientConfig{
-			User: r.User,
-			Auth: []ssh.AuthMethod{
-				ssh.PublicKeysCallback(agentClient.Signers),
-			},
-			HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
-				// TODO
-				return nil
-			},
-			BannerCallback: ssh.BannerDisplayStderr(),
-		}
-
-		r.Pool = sshpool.New(sshconfig, &sshpool.PoolConfig{Debug: false}) //r.Verbose})
 	}
 
 	return r.run()

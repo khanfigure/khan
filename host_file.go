@@ -1,5 +1,5 @@
 package khan
-
+/*
 import (
 	"bytes"
 	"fmt"
@@ -290,4 +290,4 @@ func (host *Host) Remove(path string) error {
 	}
 
 	return nil
-}
+}*/
