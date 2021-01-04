@@ -7,7 +7,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/desops/khan/rio"
+	"khan.rip/rio"
 
 	"github.com/keegancsmith/shell"
 )

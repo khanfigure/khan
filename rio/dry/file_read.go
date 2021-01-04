@@ -7,7 +7,7 @@ import (
 	"os"
 	"syscall"
 
-	"github.com/desops/khan/rio/util"
+	"khan.rip/rio/util"
 )
 
 type File struct {

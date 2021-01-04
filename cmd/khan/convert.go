@@ -8,13 +8,13 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/desops/khan"
+	"khan.rip"
 
 	"gopkg.in/yaml.v3"
 )
 
 const (
-	khanpkgname  = "github.com/desops/khan"
+	khanpkgname  = "khan.rip"
 	khanpkgalias = "khan"
 )
 

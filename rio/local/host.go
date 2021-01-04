@@ -3,7 +3,7 @@ package local
 import (
 	"sync"
 
-	"github.com/desops/khan/rio"
+	"khan.rip/rio"
 )
 
 type Host struct {

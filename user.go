@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/desops/khan/rio"
+	"khan.rip/rio"
 )
 
 type User struct {

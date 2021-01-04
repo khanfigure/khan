@@ -3,7 +3,7 @@ package khan
 import (
 	"fmt"
 
-	"github.com/desops/khan/rio"
+	"khan.rip/rio"
 )
 
 type Group struct {

@@ -3,7 +3,7 @@ package util
 import (
 	"context"
 
-	"github.com/desops/khan/rio"
+	"khan.rip/rio"
 )
 
 func Remove(host rio.Host, fpath string) error {

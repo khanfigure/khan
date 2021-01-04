@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/desops/khan"
+	"khan.rip"
 )
 
 func init() {

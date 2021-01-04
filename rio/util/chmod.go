@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/desops/khan/rio"
+	"khan.rip/rio"
 )
 
 func Chown(host rio.Host, fpath string, uid uint32, gid uint32) error {

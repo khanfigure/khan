@@ -3,8 +3,8 @@ package dry
 import (
 	"fmt"
 
-	"github.com/desops/khan/rio"
-	"github.com/desops/khan/rio/util"
+	"khan.rip/rio"
+	"khan.rip/rio/util"
 )
 
 func (host *Host) Group(name string) (*rio.Group, error) {

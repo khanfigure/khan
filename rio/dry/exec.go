@@ -3,7 +3,7 @@ package dry
 import (
 	"fmt"
 
-	"github.com/desops/khan/rio"
+	"khan.rip/rio"
 )
 
 func (host *Host) Exec(cmd *rio.Cmd) error {

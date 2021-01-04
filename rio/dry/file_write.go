@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/desops/khan/rio/util"
+	"khan.rip/rio/util"
 )
 
 type Writer struct {

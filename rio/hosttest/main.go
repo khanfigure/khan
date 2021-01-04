@@ -7,10 +7,10 @@ import (
 	"net"
 	"os"
 
-	"github.com/desops/khan/rio"
-	"github.com/desops/khan/rio/dry"
-	"github.com/desops/khan/rio/local"
-	"github.com/desops/khan/rio/remote"
+	"khan.rip/rio"
+	"khan.rip/rio/dry"
+	"khan.rip/rio/local"
+	"khan.rip/rio/remote"
 
 	"github.com/desops/sshpool"
 )

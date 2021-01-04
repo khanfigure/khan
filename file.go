@@ -10,7 +10,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/desops/khan/rio/util"
+	"khan.rip/rio/util"
 
 	"github.com/pmezard/go-difflib/difflib"
 )

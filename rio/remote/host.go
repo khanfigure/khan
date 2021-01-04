@@ -3,7 +3,7 @@ package remote
 import (
 	"sync"
 
-	"github.com/desops/khan/rio"
+	"khan.rip/rio"
 
 	"github.com/desops/sshpool"
 )

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"runtime"
 
-	"github.com/desops/khan/rio"
+	"khan.rip/rio"
 )
 
 // Host is the context for an execution run on a specific server. It contains a virtual model

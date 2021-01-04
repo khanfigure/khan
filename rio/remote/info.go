@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/desops/khan/rio"
+	"khan.rip/rio"
 )
 
 func (host *Host) Info() (*rio.Info, error) {

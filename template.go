@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/desops/khan/rio"
+	"khan.rip/rio"
 )
 
 type VaultResponse struct {

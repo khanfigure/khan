@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/desops/khan/rio"
+	"khan.rip/rio"
 )
 
 func LoadPasswords(host rio.Host) (map[string]*rio.Password, error) {
