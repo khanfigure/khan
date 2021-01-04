@@ -137,7 +137,7 @@ func Apply() error {
 		return nil
 	}
 
-	decorate := color(Red) + "KHAAAAAAAAAN" + reset()
+	decorate := color(Cyan) + "░▒▓█" + reset()
 
 	title := decorate + " "
 
