@@ -1,5 +1,6 @@
 package khan
 
+/*
 import (
 	"bytes"
 	"context"
@@ -127,4 +128,4 @@ func (cmd *Cmd) Run() error {
 		return &CmdErr{Cmd: cmd, StdErr: strings.TrimSpace(errbuf.String()), ExecErr: err}
 	}
 	return nil
-}
+}*/

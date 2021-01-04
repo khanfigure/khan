@@ -298,9 +298,9 @@ func (r *Run) run() error {
 		exec = nil
 
 		if running == 0 {
-			if r.Dry {
-				fmt.Fprintln(os.Stderr, "No actions actually performed (dry run)")
-			}
+			//if r.Dry {
+			//	fmt.Fprintln(os.Stderr, "No actions actually performed (dry run)")
+			//}
 			if errors == 0 && skipfailures == 0 {
 				return nil
 			}

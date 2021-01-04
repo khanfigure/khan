@@ -137,7 +137,9 @@ func Apply() error {
 		return nil
 	}
 
-	title := "███ "
+	decorate := color(Red) + "KHAAAAAAAAAN" + reset()
+
+	title := decorate + " "
 
 	if r.Dry {
 		title += "Dry running"
@@ -162,6 +164,6 @@ func Apply() error {
 		return err
 	}
 
-	fmt.Println("███ " + color(Green) + "✓" + reset() + " Great success!")
+	fmt.Println(decorate + " " + color(Green) + "✓" + reset() + " Great success!")
 	return nil
 }

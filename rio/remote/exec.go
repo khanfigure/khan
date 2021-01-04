@@ -13,7 +13,9 @@ import (
 )
 
 func (host *Host) Exec(cmd *rio.Cmd) error {
-	fmt.Println(host, cmd)
+	if !cmd.ReadOnly {
+		fmt.Println(host, cmd)
+	}
 
 	errbuf := &bytes.Buffer{}
 

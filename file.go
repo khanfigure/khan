@@ -62,10 +62,6 @@ func (f *File) Validate() error {
 	if f.Path == "" {
 		return errors.New("File path is required")
 	}
-	if f.Content != "" && f.Template != "" {
-		//return errors.New("File content and template cannot both be specified")
-		return fmt.Errorf("File content and template cannot both be specified (%#v %#v)", f.Content, f.Template)
-	}
 	return nil
 }
 

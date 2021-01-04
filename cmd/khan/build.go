@@ -172,7 +172,7 @@ func main() {
 		}
 	}
 
-	fmt.Println("Compiling ...")
+	//fmt.Println("Compiling ...")
 
 	cmd := exec.Command("go", "build", "-o", cwd+"/"+outfile)
 	cmd.Stdout = os.Stdout

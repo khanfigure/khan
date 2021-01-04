@@ -1,5 +1,6 @@
 package khan
 
+/*
 import (
 	"context"
 	//	"fmt"
@@ -35,4 +36,4 @@ func printExecStdin(host *Host, stdin io.Reader, c string, args ...string) error
 		return err
 	}
 	return nil
-}
+}*/
