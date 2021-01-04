@@ -31,8 +31,8 @@ func (w *Writer) Close() error {
 	}
 
 	w.file.content = w.buf.Bytes()
-	w.file.info.size = int64(len(w.file.content))
-	w.file.info.modtime = time.Now()
+	w.file.info.Fsize = int64(len(w.file.content))
+	w.file.info.Fmodtime = time.Now()
 
 	w.buf = nil
 	w.err = nil
@@ -40,6 +40,8 @@ func (w *Writer) Close() error {
 }
 
 func (host *Host) Create(fpath string) (io.WriteCloser, error) {
+	fmt.Println(host, ">", fpath)
+
 	host.fsmu.Lock()
 	defer host.fsmu.Unlock()
 
@@ -47,24 +49,26 @@ func (host *Host) Create(fpath string) (io.WriteCloser, error) {
 	if file != nil && file.info != nil {
 		// TODO: Someday, be super cool and emulate a bunch of common permission errors.
 
-		if file.info.isdir {
+		if file.info.Fisdir {
 			return nil, &os.PathError{Op: "open", Path: fpath, Err: syscall.EISDIR}
 		}
 	}
 
 	// simulate truncating whatever is there
 	file = &File{
-		info: &FileInfo{
-			name:    path.Base(fpath),
-			size:    0,
-			mode:    0644,
-			modtime: time.Now(),
-			isdir:   false,
-			uid:     host.uid,
-			gid:     host.gid,
+		info: &util.FileInfo{
+			Fname:    path.Base(fpath),
+			Fsize:    0,
+			Fmode:    0644,
+			Fmodtime: time.Now(),
+			Fisdir:   false,
+			Fuid:     host.uid,
+			Fgid:     host.gid,
 		},
 	}
 	host.fs[fpath] = file
+
+	//host.debug()
 
 	writer := &Writer{
 		file: file,
@@ -82,9 +86,13 @@ func (host *Host) Remove(fpath string) error {
 	if file != nil && file.info != nil {
 		// TODO: Someday, be super cool and emulate a bunch of common permission errors.
 
-		if file.info.isdir {
+		if file.info.Fisdir {
 			return &os.PathError{Op: "rm", Path: fpath, Err: syscall.EISDIR}
 		}
+	}
+
+	if err := util.Remove(host, fpath); err != nil {
+		return err
 	}
 
 	host.fs[fpath] = &File{}
@@ -102,21 +110,21 @@ func (host *Host) Chmod(fpath string, mode os.FileMode) error {
 			return err
 		}
 		file = &File{
-			info: &FileInfo{
-				name:    f.Name(),
-				size:    f.Size(),
-				mode:    f.Mode(),
-				modtime: f.ModTime(),
-				isdir:   f.IsDir(),
+			info: &util.FileInfo{
+				Fname:    f.Name(),
+				Fsize:    f.Size(),
+				Fmode:    f.Mode(),
+				Fmodtime: f.ModTime(),
+				Fisdir:   f.IsDir(),
 			},
 		}
 		switch st := f.Sys().(type) {
 		case *syscall.Stat_t:
-			file.info.uid = st.Uid
-			file.info.gid = st.Gid
+			file.info.Fuid = st.Uid
+			file.info.Fgid = st.Gid
 		case *util.FileInfo:
-			file.info.uid = st.Uid()
-			file.info.gid = st.Gid()
+			file.info.Fuid = st.Uid()
+			file.info.Fgid = st.Gid()
 		default:
 			fmt.Errorf("Unhandled stat type %T", f.Sys())
 		}
@@ -130,7 +138,7 @@ func (host *Host) Chmod(fpath string, mode os.FileMode) error {
 		return err
 	}
 
-	file.info.mode = mode
+	file.info.Fmode = mode
 	return nil
 }
 
@@ -145,21 +153,21 @@ func (host *Host) Chown(fpath string, uid uint32, gid uint32) error {
 			return err
 		}
 		file = &File{
-			info: &FileInfo{
-				name:    f.Name(),
-				size:    f.Size(),
-				mode:    f.Mode(),
-				modtime: f.ModTime(),
-				isdir:   f.IsDir(),
+			info: &util.FileInfo{
+				Fname:    f.Name(),
+				Fsize:    f.Size(),
+				Fmode:    f.Mode(),
+				Fmodtime: f.ModTime(),
+				Fisdir:   f.IsDir(),
 			},
 		}
 		switch st := f.Sys().(type) {
 		case *syscall.Stat_t:
-			file.info.uid = st.Uid
-			file.info.gid = st.Gid
+			file.info.Fuid = st.Uid
+			file.info.Fgid = st.Gid
 		case *util.FileInfo:
-			file.info.uid = st.Uid()
-			file.info.gid = st.Gid()
+			file.info.Fuid = st.Uid()
+			file.info.Fgid = st.Gid()
 		default:
 			fmt.Errorf("Unhandled stat type %T", f.Sys())
 		}
@@ -173,7 +181,7 @@ func (host *Host) Chown(fpath string, uid uint32, gid uint32) error {
 		return err
 	}
 
-	file.info.uid = uid
-	file.info.gid = gid
+	file.info.Fuid = uid
+	file.info.Fgid = gid
 	return nil
 }

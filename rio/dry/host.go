@@ -25,7 +25,17 @@ type Host struct {
 }
 
 func (host *Host) String() string {
-	return fmt.Sprintf("virtual host (uid %d gid %d) cascade → %s", host.uid, host.gid, host.cascade)
+	if host.cascade != nil {
+		return fmt.Sprintf("dry run (%d:%d) %s", host.uid, host.gid, host.cascade)
+	}
+	return fmt.Sprintf("dry run (%d:%d)", host.uid, host.gid)
+}
+
+func (host *Host) debug() {
+	for fpath, file := range host.fs {
+		fmt.Println(fpath)
+		fmt.Println("\t" + file.String())
+	}
 }
 
 func New(uid, gid uint32, cascade rio.Host) *Host {

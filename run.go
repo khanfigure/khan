@@ -302,7 +302,6 @@ func (r *Run) run() error {
 				fmt.Fprintln(os.Stderr, "No actions actually performed (dry run)")
 			}
 			if errors == 0 && skipfailures == 0 {
-				fmt.Fprintln(os.Stderr, "✓ Great success!")
 				return nil
 			}
 			fmt.Fprintf(os.Stderr, "%s─── %d failures ───%s\n", color(Red), errors, reset())

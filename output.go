@@ -33,8 +33,10 @@ func (o *outputter) FinishItem(start time.Time, r *Run, item Item, status itemSt
 	//	if o.bar != nil {
 	//		o.bar.Println(msg)
 	//	} else {
-	fmt.Println(msg)
 	//	}
+
+	//fmt.Println(msg)
+	_ = msg
 }
 
 func (o *outputter) Flush() {

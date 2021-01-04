@@ -176,13 +176,25 @@ func DeleteGroup(host rio.Host, name string) error {
 
 func CreateUser(host rio.Host, user *rio.User) error {
 	ctx := context.Background()
-	if err := host.Exec(rio.Command(ctx, "useradd",
-		"-u", strconv.FormatUint(uint64(user.Uid), 10),
-		"-d", user.Home,
-		"-g", user.Group,
-		"-G", strings.Join(user.Groups, ","),
-		"-c", user.Comment,
-		user.Name)); err != nil {
+	var ops []string
+	ops = append(ops, "-u", strconv.FormatUint(uint64(user.Uid), 10))
+	if user.Home != "" {
+		ops = append(ops, "-d", user.Home)
+	}
+	if user.Group != "" {
+		ops = append(ops, "-g", user.Group)
+	}
+	if len(user.Groups) > 0 {
+		ops = append(ops, "-G", strings.Join(user.Groups, ","))
+	}
+	if user.Comment != "" {
+		ops = append(ops, "-c", user.Comment)
+	}
+	if user.Shell != "" {
+		ops = append(ops, "-s", user.Shell)
+	}
+	ops = append(ops, user.Name)
+	if err := host.Exec(rio.Command(ctx, "useradd", ops...)); err != nil {
 		return err
 	}
 	return nil
@@ -206,6 +218,9 @@ func UpdateUser(host rio.Host, old *rio.User, user *rio.User) error {
 	}
 	if old.Comment != user.Comment {
 		ops = append(ops, "-c", user.Comment)
+	}
+	if old.Shell != user.Shell {
+		ops = append(ops, "-s", user.Shell)
 	}
 	if len(ops) == 0 {
 		return nil

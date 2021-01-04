@@ -101,8 +101,6 @@ func (f *File) Provides() []string {
 }
 
 func (f *File) Apply(host *Host) (itemStatus, error) {
-	status := itemModified
-
 	if f.Delete {
 		_, err := host.rh.Stat(f.Path)
 		if err != nil && iserrnotfound(err) {
@@ -171,6 +169,8 @@ func (f *File) Apply(host *Host) (itemStatus, error) {
 
 	buf, err = host.rh.ReadFile(f.Path)
 
+	status := itemModified
+
 	if err == nil && bytes.Compare(buf, []byte(content)) == 0 {
 		pstatus, err := f.applyperms(host)
 		if err != nil {
@@ -219,6 +219,11 @@ func (f *File) Apply(host *Host) (itemStatus, error) {
 	if err := fh.Close(); err != nil {
 		return 0, err
 	}
+
+	if _, err := f.applyperms(host); err != nil {
+		return 0, err
+	}
+
 	return status, nil
 }
 
@@ -278,6 +283,9 @@ func (f *File) applyperms(host *Host) (itemStatus, error) {
 		return 0, fmt.Errorf("Unknown group %#v", gstr)
 	}
 
+	wantuid = user.Uid
+	wantgid = group.Gid
+
 	fi, err := host.rh.Stat(f.Path)
 	if err != nil {
 		return 0, err
@@ -297,7 +305,7 @@ func (f *File) applyperms(host *Host) (itemStatus, error) {
 	status := itemUnchanged
 
 	if wantuid != uid || wantgid != gid {
-		fmt.Printf("wantuid %d wantgid %d uid %d gid %d\n", wantuid, wantgid, uid, gid)
+		//fmt.Printf("wantuid %d wantgid %d uid %d gid %d\n", wantuid, wantgid, uid, gid)
 		status = itemModified
 
 		if err := host.rh.Chown(f.Path, wantuid, wantgid); err != nil {
@@ -306,7 +314,7 @@ func (f *File) applyperms(host *Host) (itemStatus, error) {
 	}
 
 	if fi.Mode()&util.S_justmode != mode {
-		fmt.Printf("current: %o , masked %o , want: %o\n", uint32(fi.Mode()), uint32(fi.Mode())&util.S_justmode, mode)
+		//fmt.Printf("current: %o , masked %o , want: %o\n", uint32(fi.Mode()), uint32(fi.Mode())&util.S_justmode, mode)
 		status = itemModified
 
 		if err := host.rh.Chmod(f.Path, mode); err != nil {

@@ -2,14 +2,21 @@ package dry
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"os"
 	"syscall"
+
+	"github.com/desops/khan/rio/util"
 )
 
 type File struct {
-	info    *FileInfo // nil info means file not present (deleted)
-	content []byte    // nil content means content not cached. (zero length slice means empty file.)
+	info    *util.FileInfo // nil info means file not present (deleted)
+	content []byte         // nil content means content not cached. (zero length slice means empty file.)
+}
+
+func (f *File) String() string {
+	return fmt.Sprintf("info %s content %#v\n", f.info, string(f.content))
 }
 
 type Reader struct {
@@ -38,7 +45,7 @@ func (host *Host) Open(fpath string) (io.ReadCloser, error) {
 	}
 
 	// TODO: Someday, be super cool and emulate a bunch of common permission errors.
-	if file.info.isdir {
+	if file.info.IsDir() {
 		return nil, &os.PathError{Op: "open", Path: fpath, Err: syscall.EISDIR}
 	}
 

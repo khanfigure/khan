@@ -142,9 +142,13 @@ func Apply() error {
 	if r.Dry {
 		title += "Dry running"
 	} else {
-		title += color(Green) + "Applying" + reset()
+		title += "Applying"
 	}
-	title += " " + brightcolor(Yellow) + r.title + reset() + " " + color(Yellow) + r.describe + reset() + " on "
+	title += " " + brightcolor(Yellow) + r.title + reset()
+	if r.describe != "" && r.describe != "unknown" {
+		title += " " + color(Yellow) + r.describe + reset()
+	}
+	title += " on "
 
 	for i, host := range r.Hosts {
 		if i > 0 {
@@ -154,5 +158,10 @@ func Apply() error {
 	}
 	fmt.Println(title)
 
-	return r.run()
+	if err := r.run(); err != nil {
+		return err
+	}
+
+	fmt.Println("███ " + color(Green) + "✓" + reset() + " Great success!")
+	return nil
 }

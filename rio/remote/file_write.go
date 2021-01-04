@@ -2,14 +2,12 @@ package remote
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"io"
 	"os"
 	"strings"
 	"sync"
 
-	"github.com/desops/khan/rio"
 	"github.com/desops/khan/rio/util"
 
 	"github.com/keegancsmith/shell"
@@ -45,6 +43,8 @@ func (w *Writer) Close() error {
 }
 
 func (host *Host) Create(path string) (io.WriteCloser, error) {
+	fmt.Println(host, ">", path)
+
 	session, err := host.pool.Get(host.connect)
 	if err != nil {
 		return nil, err
@@ -89,11 +89,7 @@ func (host *Host) Create(path string) (io.WriteCloser, error) {
 }
 
 func (host *Host) Remove(fpath string) error {
-	ctx := context.Background()
-	if err := host.Exec(rio.Command(ctx, "rm", fpath)); err != nil {
-		return err
-	}
-	return nil
+	return util.Remove(host, fpath)
 }
 
 func (host *Host) Chown(fpath string, uid uint32, gid uint32) error {
