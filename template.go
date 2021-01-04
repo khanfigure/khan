@@ -7,6 +7,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+
+	"github.com/desops/khan/rio"
 )
 
 type VaultResponse struct {
@@ -30,12 +32,14 @@ func (bdl *bindataloader) Get(path string) (io.Reader, error) {
 func setContextHostTools(pcontext map[string]interface{}, host *Host) {
 	kh := pcontext["khan"].(map[string]interface{})
 	kh["secret"] = func(path string) (map[string]string, error) {
+		ctx := context.Background()
+
 		buf := &bytes.Buffer{}
-		cmd := host.Command(context.Background(), "vault", "kv", "get", "-format", "json", "secret/"+path)
+		cmd := rio.ReadOnlyCommand(ctx, "vault", "kv", "get", "-format", "json", "secret/"+path)
 		cmd.Shell = true
 		cmd.Stdout = buf
 		cmd.Stderr = os.Stderr
-		if err := cmd.Run(); err != nil {
+		if err := host.rh.Exec(cmd); err != nil {
 			return nil, err
 		}
 		var vr VaultResponse

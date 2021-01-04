@@ -27,7 +27,6 @@ type Run struct {
 
 	Pool  *sshpool.Pool
 	Hosts []*Host
-	User  string
 
 	assetfn func(string) (io.ReadCloser, error)
 
@@ -299,11 +298,10 @@ func (r *Run) run() error {
 		exec = nil
 
 		if running == 0 {
-			if r.Dry {
-				fmt.Fprintln(os.Stderr, "No actions actually performed (dry run)")
-			}
+			//if r.Dry {
+			//	fmt.Fprintln(os.Stderr, "No actions actually performed (dry run)")
+			//}
 			if errors == 0 && skipfailures == 0 {
-				fmt.Fprintln(os.Stderr, "✓ Great success!")
 				return nil
 			}
 			fmt.Fprintf(os.Stderr, "%s─── %d failures ───%s\n", color(Red), errors, reset())

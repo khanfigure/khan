@@ -7,6 +7,11 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/desops/khan/rio"
+	"github.com/desops/khan/rio/dry"
+	"github.com/desops/khan/rio/local"
+	"github.com/desops/khan/rio/remote"
+
 	"github.com/desops/sshpool"
 	"github.com/flosch/pongo2/v4"
 	"github.com/spf13/pflag"
@@ -54,43 +59,77 @@ func Apply() error {
 	localmode := false
 	pflag.BoolVarP(&localmode, "local", "l", false, "Run without SSH against local host as current user")
 
-	pflag.StringVarP(&r.User, "user", "u", os.Getenv("USER"), "SSH User")
-
 	var hostlist []string
-	pflag.StringSliceVarP(&hostlist, "host", "h", nil, "SSH Host (may be host:port, may be repeated)")
+	pflag.StringSliceVarP(&hostlist, "remote", "r", nil, "Run against remote host via SSH (user@host:port, may be repeated)")
 
 	pflag.Parse()
-
-	anyssh := false
 
 	if localmode {
 		hostname, err := os.Hostname()
 		if err != nil {
 			return err
 		}
+		rh := rio.Host(local.New())
+		if r.Dry {
+			rh = rio.Host(dry.New(uint32(os.Geteuid()), uint32(os.Getegid()), rh))
+		}
+
 		r.Hosts = append(r.Hosts, &Host{
 			Name: hostname,
 			SSH:  false,
-			Virt: NewVirtual(),
 			Run:  r,
+			rh:   rh,
 		})
 	}
 
-	if len(hostlist) > 0 {
-		anyssh = true
-		for _, h := range hostlist {
-			name := h
-			if i := strings.IndexByte(name, ':'); i > -1 {
-				name = name[:i]
+	for _, h := range hostlist {
+		if r.Pool == nil {
+			// initialize SSH pool
+			socket := os.Getenv("SSH_AUTH_SOCK")
+			conn, err := net.Dial("unix", socket)
+			if err != nil {
+				return fmt.Errorf("Failed to open SSH_AUTH_SOCK: %w", err)
 			}
-			r.Hosts = append(r.Hosts, &Host{
-				Name: name,
-				SSH:  true,
-				Host: h,
-				Virt: NewVirtual(),
-				Run:  r,
-			})
+			agentClient := agent.NewClient(conn)
+			sshconfig := &ssh.ClientConfig{
+				Auth: []ssh.AuthMethod{
+					ssh.PublicKeysCallback(agentClient.Signers),
+				},
+				HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+					// TODO
+					return nil
+				},
+				BannerCallback: ssh.BannerDisplayStderr(),
+			}
+
+			r.Pool = sshpool.New(sshconfig, &sshpool.PoolConfig{Debug: false}) //r.Verbose})
 		}
+		name := h
+		if i := strings.IndexByte(name, ':'); i > -1 {
+			name = name[:i]
+		}
+
+		rh := rio.Host(remote.New(r.Pool, h))
+		if r.Dry {
+			// This uid/gid guess is incorrect. TODO: Concurrently SSH to all the hosts and
+			// get this info correctly. This could double-serve as a pool warmup :)
+			uid := os.Geteuid()
+			gid := os.Getegid()
+			at := strings.IndexByte(h, '@')
+			if at > -1 && h[:at] == "root" {
+				uid = 0
+				gid = 0
+			}
+			rh = rio.Host(dry.New(uint32(uid), uint32(gid), rh))
+		}
+
+		r.Hosts = append(r.Hosts, &Host{
+			Name: name,
+			SSH:  true,
+			Host: h,
+			Run:  r,
+			rh:   rh,
+		})
 	}
 
 	if len(r.Hosts) == 0 {
@@ -98,14 +137,20 @@ func Apply() error {
 		return nil
 	}
 
-	title := "███ "
+	decorate := color(Red) + "KHAAAAAAAAAN" + reset()
+
+	title := decorate + " "
 
 	if r.Dry {
 		title += "Dry running"
 	} else {
-		title += color(Green) + "Applying" + reset()
+		title += "Applying"
 	}
-	title += " " + brightcolor(Yellow) + r.title + reset() + " " + color(Yellow) + r.describe + reset() + " on "
+	title += " " + brightcolor(Yellow) + r.title + reset()
+	if r.describe != "" && r.describe != "unknown" {
+		title += " " + color(Yellow) + r.describe + reset()
+	}
+	title += " on "
 
 	for i, host := range r.Hosts {
 		if i > 0 {
@@ -115,27 +160,10 @@ func Apply() error {
 	}
 	fmt.Println(title)
 
-	if anyssh {
-		socket := os.Getenv("SSH_AUTH_SOCK")
-		conn, err := net.Dial("unix", socket)
-		if err != nil {
-			return fmt.Errorf("Failed to open SSH_AUTH_SOCK: %w", err)
-		}
-		agentClient := agent.NewClient(conn)
-		sshconfig := &ssh.ClientConfig{
-			User: r.User,
-			Auth: []ssh.AuthMethod{
-				ssh.PublicKeysCallback(agentClient.Signers),
-			},
-			HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
-				// TODO
-				return nil
-			},
-			BannerCallback: ssh.BannerDisplayStderr(),
-		}
-
-		r.Pool = sshpool.New(sshconfig, &sshpool.PoolConfig{Debug: false}) //r.Verbose})
+	if err := r.run(); err != nil {
+		return err
 	}
 
-	return r.run()
+	fmt.Println(decorate + " " + color(Green) + "✓" + reset() + " Great success!")
+	return nil
 }

@@ -3,7 +3,8 @@ package khan
 import (
 	"fmt"
 	"runtime"
-	"sync"
+
+	"github.com/desops/khan/rio"
 )
 
 // Host is the context for an execution run on a specific server. It contains a virtual model
@@ -13,13 +14,10 @@ type Host struct {
 	Run *Run
 
 	Name string // Friendly name for host
-
-	SSH bool
-
+	SSH  bool
 	Host string // Host for SSH
 
-	VirtMu sync.RWMutex
-	Virt   *Virtual // Virtual model of the host
+	rh rio.Host
 }
 
 func (host *Host) Key() string {
@@ -29,13 +27,7 @@ func (host *Host) Key() string {
 	return "local"
 }
 func (host *Host) String() string {
-	title := host.Name + " "
-	if host.Host == "" {
-		title += "(local mode)"
-	} else {
-		title += fmt.Sprintf("(ssh %s@%s)", host.Run.User, host.Host)
-	}
-	return title
+	return host.rh.String()
 }
 
 func (host *Host) Add(add ...Item) error {
