@@ -1,6 +1,6 @@
 KHAN
 ----
-Khan is a super speedy configuration management tool. It generates a
+Khan is a super speedy khanfiguration management tool. It generates a
 statically compiled binary that applies your configuration locally or
 remotely via SSH. It is tightly coupled with the Go programming language.
 
