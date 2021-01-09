@@ -15,8 +15,10 @@ type Host struct {
 
 	cascade rio.Host
 
-	fsmu sync.Mutex
-	fs   map[string]*File
+	fsmu    sync.Mutex
+	fs      map[string]*File
+	tmpdir  string
+	tmpfile int
 
 	usersmu   sync.Mutex
 	users     map[string]*rio.User

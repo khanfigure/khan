@@ -34,7 +34,7 @@ func (host *Host) Open(fpath string) (io.ReadCloser, error) {
 	host.fsmu.Lock()
 	file := host.fs[fpath]
 	if file == nil && host.cascade != nil {
-		// we don't want to hold this lock while SSH does its thing
+		// we don't want to hold this lock while SSH does its thing if we don't have to
 		host.fsmu.Unlock()
 		return host.cascade.Open(fpath)
 	}

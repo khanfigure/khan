@@ -168,7 +168,7 @@ func (f *File) Apply(host *Host) (itemStatus, error) {
 	status := itemModified
 
 	if err == nil && bytes.Compare(buf, []byte(content)) == 0 {
-		pstatus, err := f.applyperms(host)
+		pstatus, err := f.applyperms(host, f.Path)
 		if err != nil {
 			return 0, err
 		}
@@ -204,7 +204,16 @@ func (f *File) Apply(host *Host) (itemStatus, error) {
 		fmt.Print(difftxt)
 	}
 
-	fh, err := host.rh.Create(f.Path)
+	// Try to make this as atomic as possible by doing the write to a temp
+	// file, getting the perms right, and when finished doing a mv to the
+	// final path.
+
+	tmpfile, err := host.rh.TmpFile()
+	if err != nil {
+		return 0, err
+	}
+
+	fh, err := host.rh.Create(tmpfile)
 	if err != nil {
 		return 0, err
 	}
@@ -216,14 +225,18 @@ func (f *File) Apply(host *Host) (itemStatus, error) {
 		return 0, err
 	}
 
-	if _, err := f.applyperms(host); err != nil {
+	if _, err := f.applyperms(host, tmpfile); err != nil {
+		return 0, err
+	}
+
+	if err := host.rh.Rename(tmpfile, f.Path); err != nil {
 		return 0, err
 	}
 
 	return status, nil
 }
 
-func (f *File) applyperms(host *Host) (itemStatus, error) {
+func (f *File) applyperms(host *Host, fpath string) (itemStatus, error) {
 	mode := f.Mode
 	if mode == 0 {
 		mode = 0644
@@ -282,21 +295,18 @@ func (f *File) applyperms(host *Host) (itemStatus, error) {
 	wantuid = user.Uid
 	wantgid = group.Gid
 
-	fi, err := host.rh.Stat(f.Path)
+	fi, err := host.rh.Stat(fpath)
 	if err != nil {
 		return 0, err
 	}
 
-	switch st := fi.Sys().(type) {
-	case *syscall.Stat_t:
-		uid = st.Uid
-		gid = st.Gid
-	case *util.FileInfo:
-		uid = st.Uid()
-		gid = st.Gid()
-	default:
-		return 0, fmt.Errorf("Unhandled system stat type %T", fi.Sys())
+	ufi, err := util.ConvertStat(fi)
+	if err != nil {
+		return 0, err
 	}
+
+	uid = ufi.Fuid
+	gid = ufi.Fgid
 
 	status := itemUnchanged
 
@@ -304,7 +314,7 @@ func (f *File) applyperms(host *Host) (itemStatus, error) {
 		//fmt.Printf("wantuid %d wantgid %d uid %d gid %d\n", wantuid, wantgid, uid, gid)
 		status = itemModified
 
-		if err := host.rh.Chown(f.Path, wantuid, wantgid); err != nil {
+		if err := host.rh.Chown(fpath, wantuid, wantgid); err != nil {
 			return 0, err
 		}
 	}
@@ -313,7 +323,7 @@ func (f *File) applyperms(host *Host) (itemStatus, error) {
 		//fmt.Printf("current: %o , masked %o , want: %o\n", uint32(fi.Mode()), uint32(fi.Mode())&util.S_justmode, mode)
 		status = itemModified
 
-		if err := host.rh.Chmod(f.Path, mode); err != nil {
+		if err := host.rh.Chmod(fpath, mode); err != nil {
 			return 0, err
 		}
 	}

@@ -190,3 +190,31 @@ func ParseStat(osname, fpath, stdout, stderr string, execerr error) (*FileInfo, 
 		return nil, fmt.Errorf("Cannot parse stat output: Unhandled OS %#v", osname)
 	}
 }
+
+func ConvertStat(f os.FileInfo) (*FileInfo, error) {
+	sys := f.Sys()
+
+	if sys != nil {
+		if ff, ok := f.Sys().(*FileInfo); ok {
+			return ff, nil
+		}
+	}
+
+	info := &FileInfo{
+		Fname:    f.Name(),
+		Fsize:    f.Size(),
+		Fmode:    f.Mode(),
+		Fmodtime: f.ModTime(),
+		Fisdir:   f.IsDir(),
+	}
+
+	switch st := sys.(type) {
+	case *syscall.Stat_t:
+		info.Fuid = st.Uid
+		info.Fgid = st.Gid
+	default:
+		return nil, fmt.Errorf("Unhandled stat type %T", sys)
+	}
+
+	return info, nil
+}

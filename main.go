@@ -80,6 +80,8 @@ func Apply() error {
 			Run:  r,
 			rh:   rh,
 		})
+
+		defer rh.Cleanup()
 	}
 
 	for _, h := range hostlist {
@@ -130,6 +132,8 @@ func Apply() error {
 			Run:  r,
 			rh:   rh,
 		})
+
+		defer rh.Cleanup()
 	}
 
 	if len(r.Hosts) == 0 {

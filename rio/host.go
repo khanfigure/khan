@@ -10,6 +10,10 @@ type Host interface {
 	String() string
 	Info() (*Info, error)
 
+	TmpFile() (string, error)
+	TmpDir() (string, error)
+	Cleanup() error
+
 	Exec(cmd *Cmd) error
 
 	Stat(string) (os.FileInfo, error)
@@ -19,6 +23,7 @@ type Host interface {
 	Remove(string) error // I'd rather call this Delete. But in this case, follow "os" package style.
 	Chmod(string, os.FileMode) error
 	Chown(string, uint32, uint32) error
+	Rename(string, string) error
 
 	User(string) (*User, error)
 	CreateUser(*User) error

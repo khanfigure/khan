@@ -30,6 +30,7 @@ func build() error {
 		if err == nil {
 			describe = string(buf)
 		}
+		// ignore err on purpose. maybe you aren't in a git repo.
 	}
 
 	if _, err := os.Stat("go.mod"); err != nil {
@@ -38,7 +39,7 @@ func build() error {
 
 	buf, err := exec.Command("go", "list", "-m").Output()
 	if err != nil {
-		return err
+		return fmt.Errorf("go list -m failed: %w", err)
 	}
 
 	outfile := strings.TrimSpace(string(buf))

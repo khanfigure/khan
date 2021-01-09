@@ -92,6 +92,10 @@ func (host *Host) Remove(fpath string) error {
 	return util.Remove(host, fpath)
 }
 
+func (host *Host) Rename(oldpath, newpath string) error {
+	return util.Rename(host, oldpath, newpath)
+}
+
 func (host *Host) Chown(fpath string, uid uint32, gid uint32) error {
 	return util.Chown(host, fpath, uid, gid)
 }

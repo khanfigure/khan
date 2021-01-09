@@ -99,6 +99,61 @@ func (host *Host) Remove(fpath string) error {
 	return nil
 }
 
+func (host *Host) Rename(fpath, newpath string) error {
+	host.fsmu.Lock()
+	defer host.fsmu.Unlock()
+
+	sa, erra := host.stat(fpath)
+	sb, errb := host.stat(newpath)
+
+	if errb == nil && sb.IsDir() {
+		return fmt.Errorf("mv: cannot overwrite directory %#v", newpath)
+	}
+
+	if erra == nil && sa.IsDir() {
+		if errb == nil && !sb.IsDir() {
+			return fmt.Errorf("mv: cannot overwrite non-directory %#v with directory %#v", newpath, fpath)
+		}
+	}
+
+	file := host.fs[fpath]
+
+	// we need to read the existing contents in order to correctly model the move, otherwise a dry run
+	// rename followed by a read would not return the correct contents. Maybe in the future, this could
+	// be replaced by a sort of virtual symlink to the cascade filesystem's path?
+	if file == nil && host.cascade != nil {
+		buf, err := host.cascade.ReadFile(fpath)
+		if err != nil {
+			return err
+		}
+
+		fi, err := util.ConvertStat(sa)
+		if err != nil {
+			return err
+		}
+
+		file = &File{
+			info:    fi,
+			content: buf,
+		}
+	}
+
+	if file == nil || file.info == nil {
+		return &os.PathError{Op: "mv", Path: fpath, Err: syscall.ENOENT}
+	}
+
+	if err := util.Rename(host, fpath, newpath); err != nil {
+		return err
+	}
+
+	host.fs[fpath] = &File{}
+	host.fs[newpath] = file
+
+	file.info.Fname = path.Base(newpath)
+
+	return nil
+}
+
 func (host *Host) Chmod(fpath string, mode os.FileMode) error {
 	host.fsmu.Lock()
 	defer host.fsmu.Unlock()
@@ -109,24 +164,14 @@ func (host *Host) Chmod(fpath string, mode os.FileMode) error {
 		if err != nil {
 			return err
 		}
-		file = &File{
-			info: &util.FileInfo{
-				Fname:    f.Name(),
-				Fsize:    f.Size(),
-				Fmode:    f.Mode(),
-				Fmodtime: f.ModTime(),
-				Fisdir:   f.IsDir(),
-			},
+
+		fi, err := util.ConvertStat(f)
+		if err != nil {
+			return err
 		}
-		switch st := f.Sys().(type) {
-		case *syscall.Stat_t:
-			file.info.Fuid = st.Uid
-			file.info.Fgid = st.Gid
-		case *util.FileInfo:
-			file.info.Fuid = st.Uid()
-			file.info.Fgid = st.Gid()
-		default:
-			fmt.Errorf("Unhandled stat type %T", f.Sys())
+
+		file = &File{
+			info: fi,
 		}
 		host.fs[fpath] = file
 	}
@@ -152,26 +197,14 @@ func (host *Host) Chown(fpath string, uid uint32, gid uint32) error {
 		if err != nil {
 			return err
 		}
+		info, err := util.ConvertStat(f)
+		if err != nil {
+			return err
+		}
+
 		file = &File{
-			info: &util.FileInfo{
-				Fname:    f.Name(),
-				Fsize:    f.Size(),
-				Fmode:    f.Mode(),
-				Fmodtime: f.ModTime(),
-				Fisdir:   f.IsDir(),
-			},
+			info: info,
 		}
-		switch st := f.Sys().(type) {
-		case *syscall.Stat_t:
-			file.info.Fuid = st.Uid
-			file.info.Fgid = st.Gid
-		case *util.FileInfo:
-			file.info.Fuid = st.Uid()
-			file.info.Fgid = st.Gid()
-		default:
-			fmt.Errorf("Unhandled stat type %T", f.Sys())
-		}
-		host.fs[fpath] = file
 	}
 	if file == nil || file.info == nil {
 		return &os.PathError{Op: "chown", Path: fpath, Err: syscall.ENOENT}
