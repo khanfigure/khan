@@ -239,3 +239,13 @@ func DeleteUser(host rio.Host, name string) error {
 	}
 	return nil
 }
+
+func UpdatePassword(host rio.Host, old *rio.Password, password *rio.Password) error {
+	ctx := context.Background()
+	if old == nil || old.Crypt != password.Crypt {
+		if err := host.Exec(rio.Command(ctx, "usermod", "-p", password.Crypt, password.Name)); err != nil {
+			return err
+		}
+	}
+	return nil
+}

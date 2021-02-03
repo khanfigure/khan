@@ -21,15 +21,11 @@ func (host *Host) Group(name string) (*rio.Group, error) {
 }
 
 func (host *Host) CreateGroup(group *rio.Group) error {
-	if err := util.CreateGroup(host, group); err != nil {
-		return err
-	}
-
 	host.usersmu.Lock()
 	defer host.usersmu.Unlock()
 
-	if host.groups == nil {
-		return nil
+	if err := util.CreateGroup(host, group); err != nil {
+		return err
 	}
 
 	host.groups[group.Name] = group
@@ -39,14 +35,6 @@ func (host *Host) CreateGroup(group *rio.Group) error {
 func (host *Host) UpdateGroup(group *rio.Group) error {
 	host.usersmu.Lock()
 	defer host.usersmu.Unlock()
-
-	if host.groups == nil {
-		var err error
-		host.users, host.groups, err = util.LoadUserGroups(host)
-		if err != nil {
-			return err
-		}
-	}
 
 	old := host.groups[group.Name]
 
@@ -59,15 +47,11 @@ func (host *Host) UpdateGroup(group *rio.Group) error {
 }
 
 func (host *Host) DeleteGroup(name string) error {
-	if err := util.DeleteGroup(host, name); err != nil {
-		return err
-	}
-
 	host.usersmu.Lock()
 	defer host.usersmu.Unlock()
 
-	if host.groups == nil {
-		return nil
+	if err := util.DeleteGroup(host, name); err != nil {
+		return err
 	}
 
 	delete(host.groups, name)
@@ -90,15 +74,11 @@ func (host *Host) User(name string) (*rio.User, error) {
 }
 
 func (host *Host) CreateUser(user *rio.User) error {
-	if err := util.CreateUser(host, user); err != nil {
-		return err
-	}
-
 	host.usersmu.Lock()
 	defer host.usersmu.Unlock()
 
-	if host.users == nil {
-		return nil
+	if err := util.CreateUser(host, user); err != nil {
+		return err
 	}
 
 	host.users[user.Name] = user
@@ -108,14 +88,6 @@ func (host *Host) CreateUser(user *rio.User) error {
 func (host *Host) UpdateUser(user *rio.User) error {
 	host.usersmu.Lock()
 	defer host.usersmu.Unlock()
-
-	if host.users == nil {
-		var err error
-		host.users, host.groups, err = util.LoadUserGroups(host)
-		if err != nil {
-			return err
-		}
-	}
 
 	old := host.users[user.Name]
 
@@ -128,15 +100,11 @@ func (host *Host) UpdateUser(user *rio.User) error {
 }
 
 func (host *Host) DeleteUser(name string) error {
-	if err := util.DeleteUser(host, name); err != nil {
-		return err
-	}
-
 	host.usersmu.Lock()
 	defer host.usersmu.Unlock()
 
-	if host.users == nil {
-		return nil
+	if err := util.DeleteUser(host, name); err != nil {
+		return err
 	}
 
 	delete(host.users, name)

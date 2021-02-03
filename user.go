@@ -101,6 +101,7 @@ func (u *User) Apply(host *Host) (itemStatus, error) {
 		userhome = "/home/" + u.Name
 	}
 
+	defaultpw := "!"
 	usershell := u.Shell
 	if usershell == "" {
 		info, err := host.rh.Info()
@@ -110,6 +111,7 @@ func (u *User) Apply(host *Host) (itemStatus, error) {
 		switch info.OS {
 		case "openbsd":
 			usershell = "/bin/ksh"
+			defaultpw = "*"
 		default:
 			usershell = "/bin/bash"
 		}
@@ -136,20 +138,44 @@ func (u *User) Apply(host *Host) (itemStatus, error) {
 		Group:   usergroup,
 		Groups:  u.Groups,
 		Home:    userhome,
-		Shell:   u.Shell,
+		Shell:   usershell,
 		Comment: u.Comment,
+	}
+
+	vp := &rio.Password{
+		Name:  u.Name,
+		Crypt: u.Password,
+	}
+	if u.Password == "" && !u.BlankPassword {
+		vp.Crypt = defaultpw
 	}
 
 	if old == nil {
 		if err := host.rh.CreateUser(v); err != nil {
 			return 0, err
 		}
+
+		if vp.Crypt != defaultpw {
+			if err := host.rh.UpdatePassword(vp); err != nil {
+				return 0, err
+			}
+		}
+
 		return itemCreated, nil
 	}
 
 	modified := false
 
 	if old.Uid != u.Uid {
+		modified = true
+	}
+
+	oldp, err := host.rh.Password(u.Name)
+	if err != nil {
+		return 0, err
+	}
+
+	if oldp.Crypt != vp.Crypt {
 		modified = true
 	}
 
@@ -208,6 +234,9 @@ func (u *User) Apply(host *Host) (itemStatus, error) {
 
 	if modified {
 		if err := host.rh.UpdateUser(v); err != nil {
+			return 0, err
+		}
+		if err := host.rh.UpdatePassword(vp); err != nil {
 			return 0, err
 		}
 		return itemModified, nil

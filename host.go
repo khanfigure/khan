@@ -47,3 +47,11 @@ func (host *Host) AddFromSource(source string, add ...Item) error {
 	}
 	return nil
 }
+
+func (host *Host) OS() (string, error) {
+	info, err := host.rh.Info()
+	if err != nil {
+		return "", err
+	}
+	return info.OS, nil
+}

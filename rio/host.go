@@ -34,6 +34,9 @@ type Host interface {
 	CreateGroup(*Group) error
 	UpdateGroup(*Group) error
 	DeleteGroup(string) error
+
+	Password(string) (*Password, error)
+	UpdatePassword(*Password) error
 }
 
 type Info struct {

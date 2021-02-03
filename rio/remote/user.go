@@ -90,15 +90,11 @@ func (host *Host) User(name string) (*rio.User, error) {
 }
 
 func (host *Host) CreateUser(user *rio.User) error {
-	if err := util.CreateUser(host, user); err != nil {
-		return err
-	}
-
 	host.usersmu.Lock()
 	defer host.usersmu.Unlock()
 
-	if host.users == nil {
-		return nil
+	if err := util.CreateUser(host, user); err != nil {
+		return err
 	}
 
 	host.users[user.Name] = user
@@ -108,14 +104,6 @@ func (host *Host) CreateUser(user *rio.User) error {
 func (host *Host) UpdateUser(user *rio.User) error {
 	host.usersmu.Lock()
 	defer host.usersmu.Unlock()
-
-	if host.users == nil {
-		var err error
-		host.users, host.groups, err = util.LoadUserGroups(host)
-		if err != nil {
-			return err
-		}
-	}
 
 	old := host.users[user.Name]
 
@@ -128,15 +116,11 @@ func (host *Host) UpdateUser(user *rio.User) error {
 }
 
 func (host *Host) DeleteUser(name string) error {
-	if err := util.DeleteUser(host, name); err != nil {
-		return err
-	}
-
 	host.usersmu.Lock()
 	defer host.usersmu.Unlock()
 
-	if host.users == nil {
-		return nil
+	if err := util.DeleteUser(host, name); err != nil {
+		return err
 	}
 
 	delete(host.users, name)

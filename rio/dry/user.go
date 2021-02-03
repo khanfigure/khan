@@ -122,6 +122,11 @@ func (host *Host) CreateUser(user *rio.User) error {
 		return err
 	}
 	host.users[user.Name] = user
+	host.passwords[user.Name] = &rio.Password{
+		Name:  user.Name,
+		Crypt: "!", // maybe be fancy later and make "*" if cascade upstream is openbsd
+	}
+
 	return nil
 }
 
