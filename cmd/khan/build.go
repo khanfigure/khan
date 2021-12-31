@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	gobuild "go/build"
 
 	"github.com/go-bindata/go-bindata/v3"
 )
@@ -172,6 +173,31 @@ func main() {
 			return err
 		}
 	}
+
+	// before we compile: We need to recursively look for import paths, and do any additional yaml translation for those packages
+
+	buildcontext := gobuild.Default
+	buildcontext.Dir = wd
+	fmt.Printf("ImportDir(%#v)\n", wd)
+	pkg, err := buildcontext.ImportDir(wd, 0)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("package %#v at %#v\n", pkg.Name, pkg.Dir)
+	for _, gof := range pkg.GoFiles {
+		fmt.Println(gof)
+	}
+	for _, imp := range pkg.Imports {
+		fmt.Println("->", imp)
+
+		ipkg, err := buildcontext.Import(imp, wd, 0)
+		if err != nil {
+			return err
+		}
+
+		fmt.Println("        ", ipkg.Dir, ipkg.ImportPath)
+	}
+
 
 	//fmt.Println("Compiling ...")
 
