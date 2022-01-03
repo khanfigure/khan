@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/md5"
 	"fmt"
+	gobuild "go/build"
 	"io"
 	"io/ioutil"
 	"os"
@@ -10,7 +11,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	gobuild "go/build"
 
 	"github.com/go-bindata/go-bindata/v3"
 )
@@ -197,7 +197,6 @@ func main() {
 
 		fmt.Println("        ", ipkg.Dir, ipkg.ImportPath)
 	}
-
 
 	//fmt.Println("Compiling ...")
 
