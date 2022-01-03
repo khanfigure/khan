@@ -68,6 +68,12 @@ func NewMachine() *Machine {
 		V: builtin_from_yaml,
 	}
 
+	scope.symbols["include"] = Value{
+		V: func(fpath string) {
+			builtin_include(&m, fpath)
+		},
+	}
+
 	m.scope = scope
 
 	return &m
