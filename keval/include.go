@@ -35,7 +35,7 @@ func builtin_include(m *Machine, fpath string) {
 
 func include(m *Machine, fpath string) error {
 
-	fmt.Println("INCLUDING", fpath)
+	//fmt.Println("INCLUDING", fpath)
 
 	ktree, err := ksyn.ParseFile(fpath)
 	if err != nil {

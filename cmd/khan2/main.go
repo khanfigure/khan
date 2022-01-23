@@ -37,7 +37,7 @@ func run() error {
 			return err
 		}
 
-		fmt.Println(ksyn.ReprUnicode(ktree))
+		//fmt.Println(ksyn.ReprUnicode(ktree))
 
 		v, err := machine.Eval(ktree)
 		if err != nil {

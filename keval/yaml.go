@@ -67,3 +67,7 @@ func builtin_from_yaml_node(node *yaml.Node) interface{} {
 
 	panic(fmt.Sprintf("Unhandled yaml node kind %d", node.Kind))
 }
+
+func (m *Machine) EvalYaml(fpath string) error {
+
+}
