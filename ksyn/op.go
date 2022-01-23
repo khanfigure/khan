@@ -132,7 +132,6 @@ func (o Operator) precedence() int {
 	case OpCall:
 		return 4
 	}
-
 	// Don't return anything < 0 unless you
 	// fix the initial value in parse.parseExpr
 	return 0

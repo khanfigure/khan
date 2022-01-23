@@ -24,8 +24,9 @@ func (_ EmitStmt) IsNode()  {}
 // Expressions
 func (_ Op) IsNode()        {}
 func (_ Str) IsNode()       {}
-func (_ Int) IsNode()       {}
+func (_ Num) IsNode()       {}
 func (_ Dict) IsNode()      {}
+func (_ List) IsNode()      {}
 func (_ RGB) IsNode()       {}
 func (_ Map) IsNode()       {}
 func (_ FuncExpr) IsNode()  {}

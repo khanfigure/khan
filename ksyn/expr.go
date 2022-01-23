@@ -12,9 +12,10 @@ type Expr interface {
 // All possible expressions
 func (_ Op) IsExpr()        {}
 func (_ Str) IsExpr()       {}
-func (_ Int) IsExpr()       {}
+func (_ Num) IsExpr()       {}
 func (_ RGB) IsExpr()       {}
 func (_ Dict) IsExpr()      {}
+func (_ List) IsExpr()      {}
 func (_ Map) IsExpr()       {}
 func (_ FuncExpr) IsExpr()  {}
 func (_ CallExpr) IsExpr()  {}
@@ -94,22 +95,6 @@ func (p *parser) exprPrimary() (Expr, error) {
 			return nil, err
 		}
 		p.chomp()
-		/*		ch2 := p.ch()
-				if ch2 == '(' {
-					start := p.pos
-
-					// looks like a function call
-					args, err := p.exprParenList()
-					if err != nil {
-						return nil, err
-					}
-					return CallExpr{
-						Ident: &ident,
-						Args:  args,
-						start: start,
-						end: p.pos,
-					}, nil
-				}*/
 		return ident, nil
 	}
 	return nil, p.unexpected("an expression")
@@ -239,9 +224,6 @@ func (p *parser) exprParen() (Expr, error) {
 }
 
 func (p *parser) exprParenList() ([]Expr, error) {
-	//if err := p.consumeRune('('); err != nil {
-	//	return nil, err
-	//}
 
 	p.chomp()
 	ch := p.ch()
