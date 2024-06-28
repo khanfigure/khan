@@ -158,6 +158,11 @@ func (f *File) Apply(host *Host) (itemStatus, error) {
 		return 0, fmt.Errorf("Unknown template engine %#v", engine)
 	}
 
+	// If content is not empty, make sure it is a valid text file and ends with a newline.
+	if len(content) > 0 && !strings.HasSuffix(content, "\n") {
+		content += "\n"
+	}
+
 	var (
 		buf []byte
 		err error
