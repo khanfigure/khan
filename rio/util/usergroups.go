@@ -98,6 +98,11 @@ func LoadUserGroups(host rio.Host) (map[string]*rio.User, map[string]*rio.Group,
 		users[u.Name] = &u
 	}
 
+	// close now, so it doesn't choke if we only have 1 ssh session available (defer doesn't run until end of function)
+	if err := fh.Close(); err != nil {
+		return nil, nil, err
+	}
+
 	gfh, err := host.Open("/etc/group")
 	if err != nil {
 		return nil, nil, err

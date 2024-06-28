@@ -164,6 +164,13 @@ func Apply() error {
 	}
 	fmt.Println(title)
 
+	for _, host := range r.Hosts {
+		_, err := host.rh.User("root")
+		if err != nil {
+			return err
+		}
+	}
+
 	if err := r.run(); err != nil {
 		return err
 	}
