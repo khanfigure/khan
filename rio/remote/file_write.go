@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"strings"
 	"sync"
@@ -43,7 +44,7 @@ func (w *Writer) Close() error {
 }
 
 func (host *Host) Create(path string) (io.WriteCloser, error) {
-	fmt.Println(host, ">", path)
+	log.Println(host, ">", path)
 
 	session, err := host.pool.Get(host.connect)
 	if err != nil {

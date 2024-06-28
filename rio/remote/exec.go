@@ -2,7 +2,8 @@ package remote
 
 import (
 	"bytes"
-	"fmt"
+	//	"fmt"
+	"log"
 	"os"
 	"strings"
 	"syscall"
@@ -13,9 +14,7 @@ import (
 )
 
 func (host *Host) Exec(cmd *rio.Cmd) error {
-	if !cmd.ReadOnly {
-		fmt.Println(host, cmd)
-	}
+	log.Println(host, cmd)
 
 	errbuf := &bytes.Buffer{}
 
@@ -29,6 +28,7 @@ func (host *Host) Exec(cmd *rio.Cmd) error {
 		return err
 	}
 	defer session.Close()
+	defer session.Put()
 
 	session.Stdin = cmd.Stdin
 	session.Stdout = cmd.Stdout

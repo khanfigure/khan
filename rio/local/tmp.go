@@ -1,8 +1,8 @@
 package local
 
 import (
-	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 )
 
@@ -12,7 +12,7 @@ func (host *Host) TmpFile() (string, error) {
 		return "", err
 	}
 
-	fmt.Println(host, "! mktemp -p", tmpdir, "XXXXXXXX")
+	log.Println(host, "! mktemp -p", tmpdir, "XXXXXXXX")
 
 	f, err := ioutil.TempFile(tmpdir, "")
 	if err != nil {
@@ -31,7 +31,7 @@ func (host *Host) TmpDir() (string, error) {
 		return host.tmpdir, nil
 	}
 
-	fmt.Println(host, "! mktemp -d /tmp/tmpkhan_XXXXXXXX")
+	log.Println(host, "! mktemp -d /tmp/tmpkhan_XXXXXXXX")
 
 	fpath, err := ioutil.TempDir("", "tmpkhan_")
 	if err != nil {
@@ -48,7 +48,7 @@ func (host *Host) Cleanup() error {
 	if host.tmpdir == "" {
 		return nil
 	}
-	fmt.Println(host, "! rm -rf", host.tmpdir)
+	log.Println(host, "! rm -rf", host.tmpdir)
 	if err := os.RemoveAll(host.tmpdir); err != nil {
 		return err
 	}
