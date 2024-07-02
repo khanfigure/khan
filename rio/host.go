@@ -24,6 +24,7 @@ type Host interface {
 	Chmod(string, os.FileMode) error
 	Chown(string, uint32, uint32) error
 	Rename(string, string) error
+	MkdirAll(string) error
 
 	User(string) (*User, error)
 	CreateUser(*User) error

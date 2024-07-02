@@ -308,7 +308,11 @@ func (r *Run) run() error {
 			for _, err := range interesting_errors {
 				fmt.Fprintln(os.Stderr, err)
 			}
-			return fmt.Errorf("%d items failed (%d items skipped)", errors, skipfailures)
+			if skipfailures == 0 {
+				return fmt.Errorf("%d items failed", errors)
+			} else {
+				return fmt.Errorf("%d items failed (%d items skipped)", errors, skipfailures)
+			}
 		}
 
 		// wait for something to finish

@@ -48,6 +48,7 @@ var yamlhandlers = map[string]yamlhandler{
 	"file":  yamlsimplehandler(&khan.File{}),
 	"group": yamlsimplehandler(&khan.Group{}),
 	"user":  yamlsimplehandler(&khan.User{}),
+	"dir":   yamlsimplehandler(&khan.Dir{}),
 }
 
 func yamlkind(kind yaml.Kind) string {

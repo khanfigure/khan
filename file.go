@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/user"
 	"strings"
-	"syscall"
 
 	"khan.rip/rio/util"
 
@@ -99,7 +98,7 @@ func (f *File) Provides() []string {
 func (f *File) Apply(host *Host) (itemStatus, error) {
 	if f.Delete {
 		_, err := host.rh.Stat(f.Path)
-		if err != nil && iserrnotfound(err) {
+		if err != nil && util.IsErrNotFound(err) {
 			return itemUnchanged, nil
 		}
 		if err != nil {
@@ -180,7 +179,7 @@ func (f *File) Apply(host *Host) (itemStatus, error) {
 		return pstatus, nil
 	}
 	if err != nil {
-		if iserrnotfound(err) {
+		if util.IsErrNotFound(err) {
 			status = itemCreated
 		} else {
 			return 0, err
@@ -334,13 +333,4 @@ func (f *File) applyperms(host *Host, fpath string) (itemStatus, error) {
 	}
 
 	return status, nil
-}
-
-func iserrnotfound(err error) bool {
-	// TODO do this better
-	v, ok := err.(*os.PathError)
-	if ok && v != nil && v.Err == syscall.ENOENT {
-		return true
-	}
-	return false
 }
