@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	"khan.rip/rio"
 	"khan.rip/rio/dry"
@@ -39,6 +40,8 @@ func SetTitle(s string) {
 }
 
 func Apply() error {
+	tstart := time.Now()
+
 	r := defaultrun
 
 	r.assetfn = mainassetfn
@@ -175,6 +178,19 @@ func Apply() error {
 		return err
 	}
 
-	fmt.Println(decorate + " " + color(Green) + "✓" + reset() + " Great success!")
+	fmt.Println(decorate + " " + color(Green) + "✓" + reset() + " Great success! (" + fmt_dur(time.Since(tstart)) + ")")
 	return nil
+}
+
+func fmt_dur(d time.Duration) string {
+	if d > time.Hour {
+		d = d / time.Minute * time.Minute
+	} else if d > time.Minute {
+		d = d / time.Second * time.Second
+	} else if d > time.Second {
+		d = d / (time.Millisecond * 100) * time.Millisecond * 100
+	} else if d > time.Millisecond {
+		d = d / time.Millisecond * time.Millisecond
+	}
+	return d.String()
 }
