@@ -8,17 +8,23 @@ import (
 )
 
 func (host *Host) Create(fpath string) (io.WriteCloser, error) {
-	log.Println(host, ">", fpath)
+	if host.verbose {
+		log.Println(host, ">", fpath)
+	}
 	return os.Create(fpath)
 }
 
 func (host *Host) Remove(fpath string) error {
-	log.Println(host, "! rm", fpath)
+	if host.verbose {
+		log.Println(host, "! rm", fpath)
+	}
 	return os.Remove(fpath)
 }
 
 func (host *Host) Rename(oldpath, newpath string) error {
-	log.Println(host, "! mv", oldpath, newpath)
+	if host.verbose {
+		log.Println(host, "! mv", oldpath, newpath)
+	}
 	return os.Rename(oldpath, newpath)
 }
 
@@ -35,11 +41,15 @@ func (host *Host) Stat(fpath string) (os.FileInfo, error) {
 }
 
 func (host *Host) Chmod(fpath string, mode os.FileMode) error {
-	log.Printf("%s ! chmod %o %s\n", host, mode, fpath)
+	if host.verbose {
+		log.Printf("%s ! chmod %o %s\n", host, mode, fpath)
+	}
 	return os.Chmod(fpath, mode)
 }
 
 func (host *Host) Chown(fpath string, uid uint32, gid uint32) error {
-	log.Printf("%s ! chown %d:%d %s\n", host, uid, gid, fpath)
+	if host.verbose {
+		log.Printf("%s ! chown %d:%d %s\n", host, uid, gid, fpath)
+	}
 	return os.Chown(fpath, int(uid), int(gid))
 }

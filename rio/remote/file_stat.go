@@ -12,7 +12,9 @@ import (
 )
 
 func (host *Host) Stat(path string) (os.FileInfo, error) {
-	log.Println(host, "stat", path)
+	if host.verbose {
+		log.Println(host, "stat", path)
+	}
 
 	// need this to know what args to pass to stat command
 	info, err := host.Info()

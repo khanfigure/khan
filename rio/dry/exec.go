@@ -1,7 +1,7 @@
 package dry
 
 import (
-	"fmt"
+	"log"
 
 	"khan.rip/rio"
 )
@@ -13,6 +13,8 @@ func (host *Host) Exec(cmd *rio.Cmd) error {
 		return host.cascade.Exec(cmd)
 	}
 
-	fmt.Println(host, cmd)
+	if host.verbose {
+		log.Println(host, cmd)
+	}
 	return nil
 }

@@ -9,6 +9,8 @@ import (
 )
 
 type Host struct {
+	verbose bool
+
 	// the user/group to emulate operations as
 	uid uint32
 	gid uint32
@@ -31,6 +33,9 @@ func (host *Host) String() string {
 		return fmt.Sprintf("dry run (%d:%d) %s", host.uid, host.gid, host.cascade)
 	}
 	return fmt.Sprintf("dry run (%d:%d)", host.uid, host.gid)
+}
+func (host *Host) SetVerbose() {
+	host.verbose = true
 }
 
 func (host *Host) debug() {

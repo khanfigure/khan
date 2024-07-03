@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path"
 	"syscall"
@@ -40,7 +41,9 @@ func (w *Writer) Close() error {
 }
 
 func (host *Host) Create(fpath string) (io.WriteCloser, error) {
-	fmt.Println(host, ">", fpath)
+	if host.verbose {
+		log.Println(host, ">", fpath)
+	}
 
 	host.fsmu.Lock()
 	defer host.fsmu.Unlock()

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -22,10 +23,11 @@ import (
 
 var (
 	defaultrun *Run = &Run{
-		meta:    map[int]*imeta{},
-		fences:  map[string]*sync.Mutex{},
-		befores: map[string][]string{},
-		errors:  map[string]error{},
+		meta:            map[int]*imeta{},
+		fences:          map[string]*sync.Mutex{},
+		befores:         map[string][]string{},
+		errors:          map[string]error{},
+		itemstatuscount: map[Status]int{},
 	}
 )
 
@@ -78,6 +80,8 @@ func Apply() error {
 		}
 
 		r.Hosts = append(r.Hosts, &Host{
+			Verbose: r.Verbose,
+
 			Name: hostname,
 			SSH:  false,
 			Run:  r,
@@ -107,7 +111,7 @@ func Apply() error {
 				BannerCallback: ssh.BannerDisplayStderr(),
 			}
 
-			r.Pool = sshpool.New(sshconfig, &sshpool.PoolConfig{Debug: false}) //r.Verbose})
+			r.Pool = sshpool.New(sshconfig, &sshpool.PoolConfig{MaxConnections: 10, MaxSessions: 10, Debug: r.Verbose})
 		}
 		name := h
 		if i := strings.IndexByte(name, ':'); i > -1 {
@@ -115,6 +119,9 @@ func Apply() error {
 		}
 
 		rh := rio.Host(remote.New(r.Pool, h))
+		if r.Verbose {
+			rh.SetVerbose()
+		}
 		if r.Dry {
 			// This uid/gid guess is incorrect. TODO: Concurrently SSH to all the hosts and
 			// get this info correctly. This could double-serve as a pool warmup :)
@@ -126,14 +133,18 @@ func Apply() error {
 				gid = 0
 			}
 			rh = rio.Host(dry.New(uint32(uid), uint32(gid), rh))
+			if r.Verbose {
+				rh.SetVerbose()
+			}
 		}
 
 		r.Hosts = append(r.Hosts, &Host{
-			Name: name,
-			SSH:  true,
-			Host: h,
-			Run:  r,
-			rh:   rh,
+			Verbose: r.Verbose,
+			Name:    name,
+			SSH:     true,
+			Host:    h,
+			Run:     r,
+			rh:      rh,
 		})
 
 		defer rh.Cleanup()
@@ -144,7 +155,7 @@ func Apply() error {
 		return nil
 	}
 
-	decorate := color(Cyan) + "▶" + reset()
+	decorate := Color{Bold: true}.String() + "khan" + reset()
 
 	title := decorate + " "
 
@@ -153,7 +164,7 @@ func Apply() error {
 	} else {
 		title += "Applying"
 	}
-	title += " " + brightcolor(Yellow) + r.title + reset()
+	title += " " + boldcolor(Yellow) + r.title + reset()
 	if r.describe != "" && r.describe != "unknown" {
 		title += " " + color(Yellow) + r.describe + reset()
 	}
@@ -178,19 +189,35 @@ func Apply() error {
 		return err
 	}
 
-	fmt.Println(decorate + " " + color(Green) + "✓" + reset() + " Great success! (" + fmt_dur(time.Since(tstart)) + ")")
-	return nil
-}
-
-func fmt_dur(d time.Duration) string {
-	if d > time.Hour {
-		d = d / time.Minute * time.Minute
-	} else if d > time.Minute {
-		d = d / time.Second * time.Second
-	} else if d > time.Second {
-		d = d / (time.Millisecond * 100) * time.Millisecond * 100
-	} else if d > time.Millisecond {
-		d = d / time.Millisecond * time.Millisecond
+	var summarychunks []string
+	var statuses []Status
+	for k := range r.itemstatuscount {
+		statuses = append(statuses, k)
 	}
-	return d.String()
+	sort.Slice(statuses, func(a, b int) bool {
+		if statuses[a] < statuses[b] {
+			return true
+		}
+		return false
+	})
+	for _, status := range statuses {
+		count := r.itemstatuscount[status]
+		if count > 0 {
+			summarychunks = append(summarychunks, fmt.Sprintf("%s%d %s%s", status.Color(), count, status, reset()))
+		}
+	}
+	summarystr := ""
+	if len(summarychunks) > 0 {
+		summarystr = "(" + strings.Join(summarychunks, ", ") + ") "
+	}
+
+	dur := time.Since(tstart)
+
+	fmt.Printf("%s %d items %sin %s\n",
+		decorate,
+		r.itemsuccesscount,
+		summarystr,
+		color_duration(dur).Wrap(format_duration(dur)),
+	)
+	return nil
 }

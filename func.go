@@ -4,7 +4,7 @@ import (
 	"errors"
 )
 
-type FuncType func(*Host) error
+type FuncType func(*Host) (Status, error)
 
 type Function struct {
 	Fn FuncType
@@ -54,6 +54,6 @@ func (f *Function) Provides() []string {
 	return nil
 }
 
-func (f *Function) Apply(host *Host) (itemStatus, error) {
-	return itemUnchanged, f.Fn(host)
+func (f *Function) Apply(host *Host) (Status, error) {
+	return f.Fn(host)
 }

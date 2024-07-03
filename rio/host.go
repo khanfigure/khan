@@ -8,6 +8,7 @@ import (
 
 type Host interface {
 	String() string
+	SetVerbose()
 	Info() (*Info, error)
 
 	TmpFile() (string, error)

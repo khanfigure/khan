@@ -1,7 +1,27 @@
+---
 file:
   path: /tmp/file_a1
   content: Content of first file!
+  user: joel
 
 file:
   path: /tmp/file_a2
   content: Content of second file!
+  user: joel
+
+file:
+  path: /tmp/file_a3
+  delete: true
+
+user:
+  name: bob
+  uid: 1016
+
+group:
+  name: bob
+  gid: 1016
+
+dir:
+  path: /home/bob
+  user: bob
+  group: bob

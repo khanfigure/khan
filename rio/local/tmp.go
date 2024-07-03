@@ -12,7 +12,9 @@ func (host *Host) TmpFile() (string, error) {
 		return "", err
 	}
 
-	log.Println(host, "! mktemp -p", tmpdir, "XXXXXXXX")
+	if host.verbose {
+		log.Println(host, "! mktemp -p", tmpdir, "XXXXXXXX")
+	}
 
 	f, err := ioutil.TempFile(tmpdir, "")
 	if err != nil {
@@ -31,7 +33,9 @@ func (host *Host) TmpDir() (string, error) {
 		return host.tmpdir, nil
 	}
 
-	log.Println(host, "! mktemp -d /tmp/tmpkhan_XXXXXXXX")
+	if host.verbose {
+		log.Println(host, "! mktemp -d /tmp/tmpkhan_XXXXXXXX")
+	}
 
 	fpath, err := ioutil.TempDir("", "tmpkhan_")
 	if err != nil {
@@ -48,7 +52,9 @@ func (host *Host) Cleanup() error {
 	if host.tmpdir == "" {
 		return nil
 	}
-	log.Println(host, "! rm -rf", host.tmpdir)
+	if host.verbose {
+		log.Println(host, "! rm -rf", host.tmpdir)
+	}
 	if err := os.RemoveAll(host.tmpdir); err != nil {
 		return err
 	}

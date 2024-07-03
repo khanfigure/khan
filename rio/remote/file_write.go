@@ -44,7 +44,9 @@ func (w *Writer) Close() error {
 }
 
 func (host *Host) Create(path string) (io.WriteCloser, error) {
-	log.Println(host, ">", path)
+	if host.verbose {
+		log.Println(host, ">", path)
+	}
 
 	session, err := host.pool.Get(host.connect)
 	if err != nil {

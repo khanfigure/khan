@@ -69,11 +69,11 @@ func (d *Dir) Provides() []string {
 	return []string{"path:" + d.Path}
 }
 
-func (d *Dir) Apply(host *Host) (itemStatus, error) {
+func (d *Dir) Apply(host *Host) (Status, error) {
 	if d.Delete {
 		_, err := host.rh.Stat(d.Path)
 		if err != nil && util.IsErrNotFound(err) {
-			return itemUnchanged, nil
+			return Unchanged, nil
 		}
 		if err != nil {
 			return 0, err
@@ -81,7 +81,7 @@ func (d *Dir) Apply(host *Host) (itemStatus, error) {
 		if err := host.rh.Remove(d.Path); err != nil {
 			return 0, err
 		}
-		return itemDeleted, nil
+		return Deleted, nil
 	}
 
 	mode := d.Mode
@@ -177,11 +177,11 @@ func (d *Dir) Apply(host *Host) (itemStatus, error) {
 	uid = ufi.Fuid
 	gid = ufi.Fgid
 
-	status := itemUnchanged
+	status := Unchanged
 
 	if wantuid != uid || wantgid != gid {
 		//fmt.Printf("wantuid %d wantgid %d uid %d gid %d\n", wantuid, wantgid, uid, gid)
-		status = itemModified
+		status = Modified
 
 		if err := host.rh.Chown(fpath, wantuid, wantgid); err != nil {
 			return 0, err
@@ -190,7 +190,7 @@ func (d *Dir) Apply(host *Host) (itemStatus, error) {
 
 	if fi.Mode()&util.S_justmode != mode {
 		//fmt.Printf("current: %o , masked %o , want: %o\n", uint32(fi.Mode()), uint32(fi.Mode())&util.S_justmode, mode)
-		status = itemModified
+		status = Modified
 
 		if err := host.rh.Chmod(fpath, mode); err != nil {
 			return 0, err
@@ -198,7 +198,7 @@ func (d *Dir) Apply(host *Host) (itemStatus, error) {
 	}
 
 	if created {
-		status = itemCreated
+		status = Created
 	}
 
 	return status, nil

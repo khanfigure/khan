@@ -2,6 +2,7 @@ package khan
 
 import (
 	"fmt"
+	"io"
 	"runtime"
 
 	"khan.rip/rio"
@@ -12,6 +13,8 @@ import (
 // This way a dry run can be pixel-perfect.
 type Host struct {
 	Run *Run
+
+	Verbose bool
 
 	Name string // Friendly name for host
 	SSH  bool
@@ -54,4 +57,9 @@ func (host *Host) OS() (string, error) {
 		return "", err
 	}
 	return info.OS, nil
+}
+
+// Passthrough functions to rio.host
+func (host *Host) Open(path string) (io.ReadCloser, error) {
+	return host.rh.Open(path)
 }

@@ -90,7 +90,7 @@ func (u *User) Provides() []string {
 	}
 }
 
-func (u *User) Apply(host *Host) (itemStatus, error) {
+func (u *User) Apply(host *Host) (Status, error) {
 	usergroup := u.Group
 	if usergroup == "" {
 		usergroup = u.Name
@@ -124,12 +124,12 @@ func (u *User) Apply(host *Host) (itemStatus, error) {
 
 	if u.Delete {
 		if old == nil {
-			return itemUnchanged, nil
+			return Unchanged, nil
 		}
 		if err := host.rh.DeleteUser(u.Name); err != nil {
 			return 0, err
 		}
-		return itemDeleted, nil
+		return Deleted, nil
 	}
 
 	v := &rio.User{
@@ -161,7 +161,7 @@ func (u *User) Apply(host *Host) (itemStatus, error) {
 			}
 		}
 
-		return itemCreated, nil
+		return Created, nil
 	}
 
 	modified := false
@@ -175,6 +175,12 @@ func (u *User) Apply(host *Host) (itemStatus, error) {
 		return 0, err
 	}
 
+	if oldp == nil {
+		panic("oldp is nil!!!!")
+	}
+	if vp == nil {
+		panic("vp is nil!!!!")
+	}
 	if oldp.Crypt != vp.Crypt {
 		modified = true
 	}
@@ -239,8 +245,8 @@ func (u *User) Apply(host *Host) (itemStatus, error) {
 		if err := host.rh.UpdatePassword(vp); err != nil {
 			return 0, err
 		}
-		return itemModified, nil
+		return Modified, nil
 	}
 
-	return itemUnchanged, nil
+	return Unchanged, nil
 }

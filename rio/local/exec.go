@@ -11,7 +11,7 @@ import (
 )
 
 func (host *Host) Exec(cmd *rio.Cmd) error {
-	if !cmd.ReadOnly {
+	if host.verbose {
 		fmt.Println(host, cmd)
 	}
 

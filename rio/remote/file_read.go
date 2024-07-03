@@ -44,7 +44,9 @@ func (r *Reader) Close() error {
 }
 
 func (host *Host) Open(path string) (io.ReadCloser, error) {
-	log.Println(host, "<", path)
+	if host.verbose {
+		log.Println(host, "<", path)
+	}
 
 	reader := &Reader{
 		procerr: make(chan error),

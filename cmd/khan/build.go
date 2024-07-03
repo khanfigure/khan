@@ -175,7 +175,7 @@ func main() {
 
 	//fmt.Println("Compiling ...")
 
-	cmd := exec.Command("go", "build", "-o", cwd+"/"+outfile)
+	cmd := exec.Command("go", "build", "-race", "-o", cwd+"/"+outfile)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Dir = wd

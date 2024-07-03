@@ -42,15 +42,17 @@ type Run struct {
 	pongocachefiles    map[string]*pongo2.Template
 	pongocachestrings  map[string]*pongo2.Template
 
-	itemsmu   sync.Mutex
-	initdone  bool
-	inititems []*inititem // items added at init() time -- need more processing before they're valid
-	items     []Item
-	meta      map[int]*imeta
-	nextid    int
-	fences    map[string]*sync.Mutex
-	befores   map[string][]string
-	errors    map[string]error
+	itemsmu          sync.Mutex
+	initdone         bool
+	inititems        []*inititem // items added at init() time -- need more processing before they're valid
+	items            []Item
+	meta             map[int]*imeta
+	nextid           int
+	fences           map[string]*sync.Mutex
+	befores          map[string][]string
+	errors           map[string]error
+	itemsuccesscount int
+	itemstatuscount  map[Status]int
 }
 
 type inititem struct {
@@ -219,7 +221,7 @@ func (r *Run) run() error {
 				item := ex.item
 				host := ex.im.host
 
-				err := func() error {
+				status, err := func() (Status, error) {
 					// be a little tricky here to allow fences to appear in the future
 					for {
 						var (
@@ -262,10 +264,10 @@ func (r *Run) run() error {
 
 						if !ok {
 							// WTF, this should never happen
-							return fmt.Errorf("Parent task error status not found")
+							return 0, fmt.Errorf("Parent task error status not found")
 						}
 						if parenterr != nil {
-							return errNeededItemFailed
+							return 0, errNeededItemFailed
 						}
 					}
 
@@ -276,7 +278,7 @@ func (r *Run) run() error {
 					}
 					r.out.FinishItem(start, r, item, status, err)
 
-					return err
+					return status, err
 				}()
 
 				r.itemsmu.Lock()
@@ -289,6 +291,10 @@ func (r *Run) run() error {
 						delete(r.fences, p)
 					}
 				}
+				if err == nil {
+					r.itemsuccesscount++
+				}
+				r.itemstatuscount[status]++
 				r.itemsmu.Unlock()
 
 				errs <- err

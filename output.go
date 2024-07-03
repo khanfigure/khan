@@ -9,33 +9,47 @@ import (
 type outputter struct {
 }
 
-func (o *outputter) FinishItem(start time.Time, r *Run, item Item, status itemStatus, err error) {
-	if err == nil && status == itemUnchanged && !r.Verbose {
+func (o *outputter) Active(r *Run, item Item, status Status) {
+	color := status.Color()
+
+	boldcolor := color
+	boldcolor.Bold = true
+
+	typ := strings.ToLower(strings.TrimPrefix(fmt.Sprintf("%T", item), "*khan."))
+
+	fmt.Println(boldcolor.Wrap(fmt.Sprintf("%8s %s", status.ActiveString(), typ)) + " " + color.Wrap(item.String()))
+}
+func (o *outputter) FinishItem(start time.Time, r *Run, item Item, status Status, err error) {
+	if err == nil && status == Unchanged && !r.Verbose {
 		return
 	}
 
 	d := time.Since(start)
-	dc := ""
-	ds := format_duration(d)
-	if d > time.Millisecond*100 {
-		dc = color(Red)
-	}
 
 	typ := strings.ToLower(strings.TrimPrefix(fmt.Sprintf("%T", item), "*khan."))
 
-	s := status.String()
+	color := status.Color()
 	if err != nil {
-		s = "error"
+		color.Color = Red
 	}
 
-	msg := fmt.Sprintf("%s%8s%s │ %-10s │ %-10s │ %s", dc, ds, reset(), typ, s, item.String())
+	boldcolor := color
+	boldcolor.Bold = true
+
+	msg := boldcolor.Wrap(fmt.Sprintf("%8s %s", status.String(), typ)) + " " + color.Wrap(item.String())
+
+	msg += " in " + color_duration(d).Wrap(format_duration(d))
+
+	if err != nil {
+		msg += " failed: " + err.Error()
+	}
 
 	//	if o.bar != nil {
 	//		o.bar.Println(msg)
 	//	} else {
 	//	}
 
-	//fmt.Println(msg)
+	fmt.Println(msg)
 	_ = msg
 }
 
@@ -56,4 +70,18 @@ func format_duration(d time.Duration) string {
 	}
 
 	return d.String()
+}
+
+func color_duration(d time.Duration) Color {
+	var dc Color
+	if d < time.Millisecond {
+		dc.Dim = true
+	} else if d > time.Millisecond*100 {
+		dc.Dim = true
+		dc.Color = Red
+	} else if d > time.Second {
+		dc.Dim = false
+		dc.Color = Red
+	}
+	return dc
 }

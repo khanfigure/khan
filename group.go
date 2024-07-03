@@ -44,7 +44,7 @@ func (g *Group) Provides() []string {
 	}
 }
 
-func (g *Group) Apply(host *Host) (itemStatus, error) {
+func (g *Group) Apply(host *Host) (Status, error) {
 	old, err := host.rh.Group(g.Name)
 	if err != nil {
 		return 0, err
@@ -52,12 +52,12 @@ func (g *Group) Apply(host *Host) (itemStatus, error) {
 
 	if g.Delete {
 		if old == nil {
-			return itemUnchanged, nil
+			return Unchanged, nil
 		}
 		if err := host.rh.DeleteGroup(g.Name); err != nil {
 			return 0, err
 		}
-		return itemDeleted, nil
+		return Deleted, nil
 	}
 
 	v := &rio.Group{
@@ -69,15 +69,15 @@ func (g *Group) Apply(host *Host) (itemStatus, error) {
 		if err := host.rh.CreateGroup(v); err != nil {
 			return 0, err
 		}
-		return itemCreated, nil
+		return Created, nil
 	}
 
 	if old.Gid != g.Gid {
 		if err := host.rh.UpdateGroup(v); err != nil {
 			return 0, err
 		}
-		return itemModified, nil
+		return Modified, nil
 	}
 
-	return itemUnchanged, nil
+	return Unchanged, nil
 }

@@ -95,19 +95,20 @@ func (f *File) Provides() []string {
 	return []string{"path:" + f.Path}
 }
 
-func (f *File) Apply(host *Host) (itemStatus, error) {
+func (f *File) Apply(host *Host) (Status, error) {
 	if f.Delete {
 		_, err := host.rh.Stat(f.Path)
 		if err != nil && util.IsErrNotFound(err) {
-			return itemUnchanged, nil
+			return Unchanged, nil
 		}
+		host.Run.out.Active(host.Run, f, Deleted)
 		if err != nil {
 			return 0, err
 		}
 		if err := host.rh.Remove(f.Path); err != nil {
 			return 0, err
 		}
-		return itemDeleted, nil
+		return Deleted, nil
 	}
 
 	content := f.Content
@@ -169,7 +170,7 @@ func (f *File) Apply(host *Host) (itemStatus, error) {
 
 	buf, err = host.rh.ReadFile(f.Path)
 
-	status := itemModified
+	status := Modified
 
 	if err == nil && bytes.Compare(buf, []byte(content)) == 0 {
 		pstatus, err := f.applyperms(host, f.Path)
@@ -180,10 +181,13 @@ func (f *File) Apply(host *Host) (itemStatus, error) {
 	}
 	if err != nil {
 		if util.IsErrNotFound(err) {
-			status = itemCreated
+			status = Created
+			host.Run.out.Active(host.Run, f, Created)
 		} else {
 			return 0, err
 		}
+	} else {
+		host.Run.out.Active(host.Run, f, Modified)
 	}
 
 	if host.Run.Diff {
@@ -240,7 +244,7 @@ func (f *File) Apply(host *Host) (itemStatus, error) {
 	return status, nil
 }
 
-func (f *File) applyperms(host *Host, fpath string) (itemStatus, error) {
+func (f *File) applyperms(host *Host, fpath string) (Status, error) {
 	mode := f.Mode
 	if mode == 0 {
 		mode = 0644
@@ -312,11 +316,11 @@ func (f *File) applyperms(host *Host, fpath string) (itemStatus, error) {
 	uid = ufi.Fuid
 	gid = ufi.Fgid
 
-	status := itemUnchanged
+	status := Unchanged
 
 	if wantuid != uid || wantgid != gid {
 		//fmt.Printf("wantuid %d wantgid %d uid %d gid %d\n", wantuid, wantgid, uid, gid)
-		status = itemModified
+		status = Modified
 
 		if err := host.rh.Chown(fpath, wantuid, wantgid); err != nil {
 			return 0, err
@@ -325,7 +329,7 @@ func (f *File) applyperms(host *Host, fpath string) (itemStatus, error) {
 
 	if fi.Mode()&util.S_justmode != mode {
 		//fmt.Printf("current: %o , masked %o , want: %o\n", uint32(fi.Mode()), uint32(fi.Mode())&util.S_justmode, mode)
-		status = itemModified
+		status = Modified
 
 		if err := host.rh.Chmod(fpath, mode); err != nil {
 			return 0, err

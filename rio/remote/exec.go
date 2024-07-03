@@ -14,7 +14,9 @@ import (
 )
 
 func (host *Host) Exec(cmd *rio.Cmd) error {
-	log.Println(host, cmd)
+	if host.verbose {
+		log.Println(host, cmd)
+	}
 
 	errbuf := &bytes.Buffer{}
 

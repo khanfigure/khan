@@ -9,6 +9,8 @@ import (
 )
 
 type Host struct {
+	verbose bool
+
 	pool    *sshpool.Pool
 	connect string
 
@@ -26,6 +28,10 @@ type Host struct {
 
 func (host *Host) String() string {
 	return "ssh " + host.connect
+}
+
+func (host *Host) SetVerbose() {
+	host.verbose = true
 }
 
 func New(pool *sshpool.Pool, connect string) *Host {

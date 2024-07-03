@@ -7,6 +7,8 @@ import (
 )
 
 type Host struct {
+	verbose bool
+
 	// cache
 	usersmu   sync.Mutex
 	users     map[string]*rio.User
@@ -19,6 +21,10 @@ type Host struct {
 
 func (host *Host) String() string {
 	return "local"
+}
+
+func (host *Host) SetVerbose() {
+	host.verbose = true
 }
 
 func New() *Host {

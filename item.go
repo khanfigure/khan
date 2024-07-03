@@ -9,29 +9,53 @@ type metadata struct {
 	source string
 }
 
-type itemStatus int
+type Status int
 
 const (
-	invalidItemStatus itemStatus = iota
-	itemUnchanged
-	itemCreated
-	itemModified
-	itemDeleted
+	InvalidStatus Status = iota
+	Unchanged
+	Created
+	Modified
+	Deleted
 )
 
-func (s itemStatus) String() string {
+func (s Status) String() string {
 	switch s {
-	case itemUnchanged:
+	case Unchanged:
 		return "unchanged"
-	case itemCreated:
+	case Created:
 		return "created"
-	case itemModified:
+	case Modified:
 		return "modified"
-	case itemDeleted:
+	case Deleted:
 		return "deleted"
 	default:
 		return fmt.Sprintf("invalidItemStatus(%d)", s)
 	}
+}
+func (s Status) ActiveString() string {
+	switch s {
+	case Created:
+		return "creating"
+	case Modified:
+		return "updating"
+	case Deleted:
+		return "deleting"
+	default:
+		return fmt.Sprintf("invalidItemStatus(%d)", s)
+	}
+}
+
+func (s Status) Color() Color {
+	switch s {
+	case Created:
+		return Color{Color: Green}
+	case Modified:
+		return Color{Color: Cyan}
+	case Deleted:
+		return Color{Color: Yellow}
+	}
+	return Color{}
 }
 
 type Item interface {
@@ -41,7 +65,7 @@ type Item interface {
 	Clone() Item
 	String() string
 
-	Apply(host *Host) (itemStatus, error)
+	Apply(host *Host) (Status, error)
 
 	Provides() []string
 	After() []string
