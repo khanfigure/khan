@@ -1,6 +1,7 @@
 package util
 
 import (
+	"bytes"
 	"context"
 	"strconv"
 	"strings"
@@ -153,12 +154,43 @@ func LoadUserGroups(host rio.Host) (map[string]*rio.User, map[string]*rio.Group,
 	return users, groups, nil
 }
 
-func CreateGroup(host rio.Host, group *rio.Group) error {
+func CreateGroup(host rio.Host, group *rio.Group) (uint32, error) {
 	ctx := context.Background()
-	if err := host.Exec(rio.Command(ctx, "groupadd", "-g", strconv.FormatUint(uint64(group.Gid), 10), group.Name)); err != nil {
-		return err
+	var ops []string
+
+	if group.Name != "root" && group.Gid == 0 {
+		// auto-assign gid
+	} else {
+		ops = append(ops, "-g", strconv.FormatUint(uint64(group.Gid), 10))
 	}
-	return nil
+	ops = append(ops, group.Name)
+	if err := host.Exec(rio.Command(ctx, "groupadd", ops...)); err != nil {
+		return 0, err
+	}
+
+	if group.Name != "root" && group.Gid == 0 {
+		buf := &bytes.Buffer{}
+
+		cmd := rio.Command(ctx, "id", "-g", group.Name)
+		cmd.Stdout = buf
+		cmd.ReadOnly = true
+
+		if err := host.Exec(cmd); err != nil {
+			return 0, err
+		}
+
+		gidstr := strings.TrimSpace(buf.String())
+		v, err := strconv.ParseInt(gidstr, 10, 32)
+		if err != nil {
+			return 0, err
+		}
+
+		// Return the newly created gid
+		return uint32(v), nil
+	}
+
+	// Assume we created the requested gid
+	return group.Gid, nil
 }
 
 func UpdateGroup(host rio.Host, old *rio.Group, group *rio.Group) error {
@@ -179,10 +211,16 @@ func DeleteGroup(host rio.Host, name string) error {
 	return nil
 }
 
-func CreateUser(host rio.Host, user *rio.User) error {
+func CreateUser(host rio.Host, user *rio.User) (uint32, error) {
 	ctx := context.Background()
 	var ops []string
-	ops = append(ops, "-u", strconv.FormatUint(uint64(user.Uid), 10))
+
+	if user.Name != "root" && user.Uid == 0 {
+		// auto-assign uid.
+	} else {
+		ops = append(ops, "-u", strconv.FormatUint(uint64(user.Uid), 10))
+	}
+
 	if user.Home != "" {
 		ops = append(ops, "-d", user.Home)
 	}
@@ -200,9 +238,32 @@ func CreateUser(host rio.Host, user *rio.User) error {
 	}
 	ops = append(ops, user.Name)
 	if err := host.Exec(rio.Command(ctx, "useradd", ops...)); err != nil {
-		return err
+		return 0, err
 	}
-	return nil
+
+	if user.Name != "root" && user.Uid == 0 {
+		buf := &bytes.Buffer{}
+
+		cmd := rio.Command(ctx, "id", "-u", user.Name)
+		cmd.Stdout = buf
+		cmd.ReadOnly = true
+
+		if err := host.Exec(cmd); err != nil {
+			return 0, err
+		}
+
+		uidstr := strings.TrimSpace(buf.String())
+		v, err := strconv.ParseInt(uidstr, 10, 32)
+		if err != nil {
+			return 0, err
+		}
+
+		// Return the newly created uid
+		return uint32(v), nil
+	}
+
+	// Assume we created the requested uid
+	return user.Uid, nil
 }
 
 func UpdateUser(host rio.Host, old *rio.User, user *rio.User) error {

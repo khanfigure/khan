@@ -8,7 +8,7 @@ import (
 )
 
 type User struct {
-	Name string
+	Name string `khan:"name,shortvalue"`
 
 	// Primary group. If not specified, user name is used
 	Group string

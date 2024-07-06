@@ -5,10 +5,6 @@ import (
 	"runtime"
 )
 
-type metadata struct {
-	source string
-}
-
 type Status int
 
 const (

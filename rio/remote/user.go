@@ -21,9 +21,11 @@ func (host *Host) Group(name string) (*rio.Group, error) {
 }
 
 func (host *Host) CreateGroup(group *rio.Group) error {
-	if err := util.CreateGroup(host, group); err != nil {
+	gid, err := util.CreateGroup(host, group)
+	if err != nil {
 		return err
 	}
+	group.Gid = gid // Yuck
 
 	host.usersmu.Lock()
 	defer host.usersmu.Unlock()
@@ -93,10 +95,12 @@ func (host *Host) CreateUser(user *rio.User) error {
 	host.usersmu.Lock()
 	defer host.usersmu.Unlock()
 
-	if err := util.CreateUser(host, user); err != nil {
+	uid, err := util.CreateUser(host, user)
+	if err != nil {
 		return err
 	}
 
+	user.Uid = uid // Yuck
 	host.users[user.Name] = user
 	return nil
 }

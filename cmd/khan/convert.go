@@ -45,10 +45,11 @@ func (err yamlerror) Error() string {
 type yamlhandler func(w *yamlwalker, v *yaml.Node) error
 
 var yamlhandlers = map[string]yamlhandler{
-	"file":  yamlsimplehandler(&khan.File{}),
-	"group": yamlsimplehandler(&khan.Group{}),
-	"user":  yamlsimplehandler(&khan.User{}),
-	"dir":   yamlsimplehandler(&khan.Dir{}),
+	"file":    yamlsimplehandler(&khan.File{}),
+	"group":   yamlsimplehandler(&khan.Group{}),
+	"user":    yamlsimplehandler(&khan.User{}),
+	"dir":     yamlsimplehandler(&khan.Dir{}),
+	"service": yamlsimplehandler(&khan.Service{}),
 }
 
 func yamlkind(kind yaml.Kind) string {

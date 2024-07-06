@@ -7,7 +7,7 @@ import (
 )
 
 type Group struct {
-	Name string
+	Name string `khan:"name,shortvalue"`
 	Gid  uint32
 
 	Delete bool
